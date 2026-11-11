@@ -30,9 +30,12 @@ function chord(scale, tok) {
 // street / hw: 16-step drum and bass patterns for the two speed zones. Hats (x = closed, o = open) are shared.
 // arp = which chord tone to play; lead = semitones above the key note (null = rest).
 // More melodies and arp patterns are derived from these below, so each track has several to rotate through.
+// kit: the track's own drum sounds, pad tone, instrument tones and amount of echo.
 const TRACKS = {
   night: {
     name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
+    vibe: 'Synthwave',
+    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28 },
     dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
     hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
     street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
@@ -43,26 +46,32 @@ const TRACKS = {
   },
   neon: { // slower and moodier
     name: 'Neon Coast', bpm: 96, swing: 0, root: 42, scale: 'minor',
+    vibe: 'Dreamy and slow',
+    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42 },
     dirs: { N: '1 7o 6 7n 1 7o 6 5', E: '6 3 7 1 6 3 4 5', S: '1 1n 4 4 6 6 7 7o', W: '4 1 6 7 4 1 3 7n' },
     hwDirs: { N: '6 7 1 3 6 7 1 1n', E: '3 7 4 1 3 7 6 5', S: '1 6 4 5 1 6 7 7o', W: '4 5 6 3 4 5 7 1' },
-    street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' },
-    hw: { kick: 'x...x...x..xx...', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
+    street: { kick: 'x.........x.....', snare: '........x.......', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' }, // half-time: the beat feels half as fast
+    hw: { kick: 'x.....x...x.....', snare: '........x.....x.', bass: 'x.x.x.x.x.x.x.x.' },
     bassWave: 'sawtooth', arpWave: 'sawtooth',
     arp: [0, 1, 2, 3, null, 2, 1, 2, 0, 1, 2, 3, null, 3, 2, 1],
     lead: [null, null, 12, null, 15, null, 12, null, 10, null, null, 7, null, null, 10, null],
   },
-  afterglow: { // faster and brighter
-    name: 'Afterglow', bpm: 112, swing: 0, root: 47, scale: 'minor',
-    dirs: { N: '6 7o 1 1n 6 7o 3 3n', E: '1 3 7 4 1 3 6 7', S: '4 5 1 1n 4 5 6 7', W: '6 4 1 7o 6 4 3 5' },
-    hwDirs: { N: '3 4 6 7 3 4 1 1n', E: '1 7 6 7o 1 7 6 5', S: '6 3 4 1 6 3 7 7o', W: '4 6 7 1 4 6 7 3' },
+  afterglow: { // faster, in a major key
+    name: 'Afterglow', bpm: 112, swing: 0, root: 47, scale: 'major',
+    vibe: 'Bright and uplifting',
+    kit: { kickHz: 170, kickTail: 0.26, snareHz: 2200, snareDur: 0.14, hatHz: 9000, pad: 'sawtooth', waves: ['square', 'sawtooth'], echo: 0.24 },
+    dirs: { N: '1 5 6 4 1 5 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 4 5 5' },
+    hwDirs: { N: '4 1 5 6 4 1 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '1 4 6 5 2 3 4 5' },
     street: { kick: 'x...x...x...x...', snare: '....x.......x.x.', hat: '..o...o...o...o.', bass: 'x.xxx.xxx.xxx.xx' },
     hw: { kick: 'x...x...x...x..x', snare: '....x.......x.xx', bass: 'x.x.x.x.x.x.x.x.' },
     bassWave: 'sawtooth', arpWave: 'square',
     arp: [0, 2, 3, 2, 1, 2, 3, 2, 0, 2, 3, 2, 1, 3, 2, 3],
-    lead: [7, null, null, 10, null, 12, null, null, 15, null, 12, null, 10, null, null, null],
+    lead: [7, null, null, 9, null, 12, null, null, 16, null, 12, null, 9, null, null, null],
   },
   sunday: {
     name: 'Sunday', bpm: 84, swing: 0.16, root: 48, scale: 'major',
+    vibe: 'Laid-back lo-fi',
+    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.2 },
     dirs: { N: '1 6 2 5 3 6 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 5 1n 4' },
     hwDirs: { N: '4 3 2 1 4 3 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '2 3 4 5 6 5 4 5' },
     street: { kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x......x..x...x.' },
@@ -73,11 +82,13 @@ const TRACKS = {
   },
   autobahn: {
     name: 'Autobahn', bpm: 128, swing: 0, root: 43, scale: 'minor',
+    vibe: 'Hard and fast',
+    kit: { kickHz: 190, kickTail: 0.22, snareHz: 2400, snareDur: 0.1, hatHz: 10000, pad: 'square', waves: ['sawtooth', 'square'], echo: 0.12 },
     dirs: { N: '1 6 3o 7o 1 6 4 5', E: '1 1 6 6 1 1 7 7', S: '4 4 1 1 6 6 5 5', W: '6 7 1 3 6 7 1 5' },
     hwDirs: { N: '6 6 7 7 1 1 3 3', E: '3 7 1 6 3 7 4 4', S: '1 4 7 3 6 4 5 5', W: '4 6 1 5 4 6 7 7o' },
     street: { kick: 'x...x...x...x...', snare: '....x.......x..x', hat: '..o...o...o...o.', bass: '.xxx.xxx.xxx.xxx' },
     hw: { kick: 'x...x...x...x.xx', snare: '....x.......x..x', bass: 'x.x.x.x.x.x.x.x.' },
-    bassWave: 'sawtooth', arpWave: 'sawtooth',
+    bassWave: 'square', arpWave: 'sawtooth',
     arp: [0, 2, 1, 3, 0, 2, 1, 3, 0, 2, 1, 3, 0, 3, 2, 1],
     lead: [12, null, 12, null, null, 15, null, null, 10, null, 10, null, null, 7, null, null],
   },
@@ -134,12 +145,11 @@ const CELLS = { // four-chord movements that work in each kind of key
 };
 const TURNS = { minor: ['5', '7', '7o', '3', '3n'], major: ['5', '5', '4', '2', '1n'] }; // chords that lead back to the start
 const BASS_POOL = ['x.x.x.x.x.x.x.xx', 'x..x..x.x..x..x.', 'x.xxx.xxx.xxx.xx', 'x...x.x.x...x.xx', 'x.x...x.x.x...x.'];
-const WAVES = ['sawtooth', 'square', 'triangle'];
 const KEY_MOVES = [5, -2, 3, -4, 7, -5, 2]; // semitones to the next chapter's key
 
 function makeChapter(id, n) {
   const tr = TRACKS[id];
-  if (n === 0) return { n, shift: 0, prog: tr.prog, leads: tr.leads, arps: tr.arps, leadWave: 'sawtooth', arpWave: tr.arpWave, bass: tr.street.bass };
+  if (n === 0) return { n, shift: 0, prog: tr.prog, leads: tr.leads, arps: tr.arps, leadWave: tr.kit.waves[0], arpWave: tr.arpWave, bass: tr.street.bass };
   const rnd = seeded(tr.seed + n * 7919);
   const pick = (list) => list[Math.floor(rnd() * list.length)];
 
@@ -174,7 +184,7 @@ function makeChapter(id, n) {
     highway: [1, 2, 3, 4].map((m) => makePhrase(pent, tr.seed + n * 104729 + 5000 + m * 613, true)),
   };
   const arps = tr.arps.map((_, k) => tr.arps[(k + n) % tr.arps.length]);
-  return { n, shift, prog, leads, arps, leadWave: pick(WAVES), arpWave: pick(WAVES), bass: pick(BASS_POOL) };
+  return { n, shift, prog, leads, arps, leadWave: pick(tr.kit.waves), arpWave: pick(tr.kit.waves), bass: pick(BASS_POOL) };
 }
 // Each compass direction has a signature sound. Their volumes follow the heading, so NE is half N, half E.
 const DIR_SOUND = { N: 'glass', E: 'pluck', S: 'drone', W: 'strings' };
@@ -307,7 +317,9 @@ const currentChord = () => chap.prog[seq.zone][seq.dir][seq.bar];
 
 function setPadChord(chord, t) {
   const root = TRACKS[settings.track].root + chap.shift;
+  const padWave = TRACKS[settings.track].kit.pad;
   for (const { o, v } of A.padOsc) {
+    if (o.type !== padWave) o.type = padWave;
     // Every other pass through the sequence, the lowest voice moves up an octave for a different colour.
     const lift = (seq.cycle & 1) && v === 0 ? 12 : 0;
     o.frequency.setTargetAtTime(mtof(root + 12 + chord.r + chord.iv[v] + lift), t, 0.06);
@@ -336,8 +348,9 @@ function setTempoFx(t) {
 // punch (0-1) is how hard the car is accelerating: a sharper attack, a click on top and a longer tail.
 function kick(t, pump, punch) {
   const o = ctx.createOscillator(), g = ctx.createGain();
-  const tail = 0.32 + 0.14 * punch;
-  o.frequency.setValueAtTime(150 + 70 * punch, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  const kit = TRACKS[settings.track].kit;
+  const tail = kit.kickTail + 0.14 * punch;
+  o.frequency.setValueAtTime(kit.kickHz + 70 * punch, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
   g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + tail);
   o.connect(g); g.connect(A.layer.kick); o.start(t); o.stop(t + tail + 0.03);
   if (punch > 0.2) noiseHit(t, A.layer.kick, 'highpass', 2500, 0.02, 0.5 * punch);
@@ -364,7 +377,8 @@ function pluck(t, out, midi, wave, dur, vol, cutoff, detune = 0) {
 }
 
 function snareHit(t, vol) {
-  noiseHit(t, A.layer.snare, 'bandpass', 1800, 0.18, 0.9 * vol);
+  const kit = TRACKS[settings.track].kit;
+  noiseHit(t, A.layer.snare, 'bandpass', kit.snareHz, kit.snareDur, 0.9 * vol);
   pluck(t, A.layer.snare, 55, 'triangle', 0.1, 0.5 * vol, 900);
 }
 
@@ -449,8 +463,8 @@ function scheduleStep(t) {
   }
   if (L.hats > 0.01) {
     const h = tr.street.hat[i]; // hats keep the same pace in every zone, so the song never seems to speed up
-    if (h === 'o') noiseHit(t, A.layer.hats, 'highpass', 7500, 0.1, 0.8);
-    else if (h === 'x' && !breakdown) noiseHit(t, A.layer.hats, 'highpass', 7500, 0.04, 0.8);
+    if (h === 'o') noiseHit(t, A.layer.hats, 'highpass', tr.kit.hatHz, 0.1, 0.8);
+    else if (h === 'x' && !breakdown) noiseHit(t, A.layer.hats, 'highpass', tr.kit.hatHz, 0.04, 0.8);
   }
   if (L.bass > 0.01 && bassPattern[i] === 'x' && !breakdown) {
     // Driving groove: steady eighth notes, low on the beat and an octave up in between, with a brighter bite.
@@ -718,7 +732,7 @@ function control() {
   }
   const drift = 1 + 0.25 * Math.sin(now / 1000 * 2 * Math.PI * 0.05); // slow sweep so a held chord still moves
   A.padFilter.frequency.setTargetAtTime((280 + 3200 * I) * drift * (1 + 0.3 * mix.bright), t, 0.3);
-  A.wet.gain.setTargetAtTime(0.28 - 0.1 * mix.bright, t, 0.5);
+  A.wet.gain.setTargetAtTime(Math.max(0.05, TRACKS[settings.track].kit.echo - 0.1 * mix.bright), t, 0.5);
   A.lp.frequency.setTargetAtTime(18000 * Math.pow(0.03, brake), t, 0.12); // braking closes the filter
   const turnN = clamp(input.turn / 25, -1, 1);
   if (A.pan.pan) A.pan.pan.setTargetAtTime(turnN * 0.8, t, 0.2);
@@ -762,6 +776,7 @@ function stop() {
   Object.assign(mix, { intensity: 0, boost: 0, brake: 0, surge: 0, zoneWant: 'street' });
   for (const l of LAYERS) mix.level[l] = 0;
   for (const d of DIRS) mix.dirW[d] = 0;
+  eqLevels.fill(0);
   if (wakeLock) wakeLock.release().catch(() => {});
   statusText = 'Ready';
   render();
@@ -783,32 +798,28 @@ async function setSource(src) {
 }
 
 /* ---------- UI ---------- */
-const ARC = 2 * Math.PI * 120 * 0.75;
 const POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-const pills = {};
 let frameQueued = false;
 
+function chooseTrack(id) {
+  settings.track = id; store.set('rm.track', id);
+  // Choosing a track starts its story from chapter 1, at its own tempo.
+  seq.cycle = 0; seq.bar = 0; seq.step = 0; seq.bpm = TRACKS[id].bpm;
+  chap = makeChapter(id, 0);
+  if (ctx) seq.trackStart = ctx.currentTime; // restart the rotation clock
+  applyTrack();
+  render();
+}
+
 function buildUI() {
-  const row = $('#layers');
-  for (const name of LAYERS) {
-    const el = document.createElement('span'); el.className = 'pill'; el.textContent = name;
-    row.appendChild(el); pills[name] = el;
+  for (const [id, t] of Object.entries(TRACKS)) {
+    const b = document.createElement('button'); b.type = 'button'; b.dataset.id = id;
+    const name = document.createElement('b'); name.textContent = t.name;
+    const vibe = document.createElement('span'); vibe.textContent = t.vibe;
+    b.append(name, vibe);
+    b.onclick = () => chooseTrack(id);
+    $('#tracks').appendChild(b);
   }
-  for (const d of DIRS) {
-    const el = document.createElement('span'); el.className = 'pill'; el.textContent = `${d} · ${DIR_SOUND[d]}`;
-    $('#compass').appendChild(el); pills[d] = el;
-  }
-  const sel = $('#track');
-  for (const [id, t] of Object.entries(TRACKS)) sel.add(new Option(`${t.name} · ${t.bpm} bpm`, id));
-  sel.value = settings.track;
-  sel.onchange = () => {
-    settings.track = sel.value; store.set('rm.track', sel.value);
-    // Choosing a track starts its story from chapter 1, at its own tempo.
-    seq.cycle = 0; seq.bar = 0; seq.step = 0; seq.bpm = TRACKS[sel.value].bpm;
-    chap = makeChapter(sel.value, 0);
-    if (ctx) seq.trackStart = ctx.currentTime; // restart the rotation clock
-    applyTrack();
-  };
 
   for (const seg of document.querySelectorAll('.seg')) {
     const key = seg.dataset.key;
@@ -846,24 +857,45 @@ function buildUI() {
   });
 }
 
+// Equalizer: 20 bars from low notes (left) to high (right), rising fast and falling slowly.
+const eqData = new Uint8Array(256), eqLevels = new Array(20).fill(0);
+
+function drawEq() {
+  const c = $('#eq'), g = c.getContext('2d');
+  const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  if (running && A) A.analyser.getByteFrequencyData(eqData);
+  const n = eqLevels.length, gap = 6, bw = (w - gap * (n - 1)) / n;
+  const grad = g.createLinearGradient(0, 0, w, 0);
+  grad.addColorStop(0, '#3ad6ff'); grad.addColorStop(1, '#ff4fd8');
+  g.fillStyle = mix.brake > 0.3 ? '#ff5a4f' : grad; // red while braking
+  for (let k = 0; k < n; k++) {
+    const lo = Math.floor(Math.pow(128, k / n)), hi = Math.max(lo + 1, Math.floor(Math.pow(128, (k + 1) / n)));
+    let peak = 0;
+    for (let bin = lo; bin < hi; bin++) peak = Math.max(peak, eqData[bin]);
+    const target = running ? peak / 255 : 0;
+    eqLevels[k] += (target - eqLevels[k]) * (target > eqLevels[k] ? 0.6 : 0.15);
+    const bh = Math.max(4, eqLevels[k] * h), x = k * (bw + gap);
+    if (g.roundRect) { g.beginPath(); g.roundRect(x, h - bh, bw, bh, Math.min(4, bw / 2)); g.fill(); }
+    else g.fillRect(x, h - bh, bw, bh);
+  }
+}
+
 function render() {
   const kmh = settings.units === 'kmh';
-  $('#speed').textContent = Math.round(input.speed * (kmh ? 3.6 : 2.23694));
-  $('#unit').textContent = kmh ? 'km/h' : 'mph';
-  if ($('#track').value !== settings.track) $('#track').value = settings.track; // follows track rotation
+  const speed = running ? `${Math.round(input.speed * (kmh ? 3.6 : 2.23694))} ${kmh ? 'km/h' : 'mph'}` : '';
   const zone = !running ? '' : input.speed < 0.4 ? 'Idle' : mix.surge > 0.5 ? 'Surge' : mix.zoneWant === 'highway' ? 'Highway' : 'Street';
   const point = input.heading == null ? '' : POINTS[Math.round(input.heading / 45) % 8];
-  $('#zone').textContent = [zone, point, running ? 'Ch ' + (chap.n + 1) : ''].filter(Boolean).join(' · ');
+  $('#zone').textContent = [speed, zone, point, running ? 'Ch ' + (chap.n + 1) : ''].filter(Boolean).join(' · ');
   for (const b of $('#hwy').children) b.textContent = HWY_LABEL[kmh ? 'kmh' : 'mph'][b.dataset.v];
-  $('#arc').style.strokeDashoffset = ARC * (1 - mix.intensity);
-  for (const name of LAYERS) pills[name].style.setProperty('--on', mix.level[name].toFixed(2));
-  for (const d of DIRS) pills[d].style.setProperty('--on', mix.dirW[d].toFixed(2));
-  $('#dot').style.transform = `translate(${clamp(input.turn / 25, -1, 1) * 30}px, ${clamp(-input.long / 0.4, -1, 1) * 30}px)`;
+  for (const b of $('#tracks').children) b.setAttribute('aria-pressed', b.dataset.id === settings.track); // follows track rotation
   $('#status').textContent = statusText;
   $('#go').textContent = running ? 'Stop' : 'Start';
   $('#go').classList.toggle('on', running);
   $('#sim').hidden = settings.source !== 'sim';
-  document.body.classList.toggle('braking', mix.brake > 0.3);
+  drawEq();
   if (running && !frameQueued) {
     frameQueued = true;
     requestAnimationFrame(() => { frameQueued = false; render(); });

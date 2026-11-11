@@ -21,73 +21,58 @@
     <p id="status" role="status">Ready</p>
   </header>
 
-  <section class="dial" aria-label="Speed and intensity">
-    <svg viewBox="0 0 280 280" aria-hidden="true">
-      <defs>
-        <linearGradient id="grad" x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0" stop-color="#3ad6ff"/><stop offset="1" stop-color="#ff4fd8"/>
-        </linearGradient>
-      </defs>
-      <circle class="track" cx="140" cy="140" r="120"/>
-      <circle id="arc" cx="140" cy="140" r="120"/>
-    </svg>
-    <div class="readout">
-      <span id="speed">0</span>
-      <span id="unit">mph</span>
-      <span id="zone"></span>
-    </div>
-    <div class="gmeter" title="Acceleration and turning"><i id="dot"></i></div>
-  </section>
+  <canvas id="eq" aria-hidden="true"></canvas>
+  <p id="zone"></p>
 
-  <div id="layers" aria-label="Active layers"></div>
-  <div id="compass" aria-label="Compass sounds"></div>
+  <div id="tracks" role="group" aria-label="Track"></div>
 
   <button id="go" type="button">Start</button>
 
-  <section id="sim" hidden>
-    <input id="steer" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Steering">
-    <div class="pedals">
-      <button id="brake" type="button">Brake</button>
-      <button id="gas" type="button">Gas</button>
-      <button id="floor" type="button">Floor it</button>
-    </div>
-    <p class="hint">Hold a pedal, drag to steer. Keys: arrows, and F to floor it.</p>
-  </section>
+  <details id="more">
+    <summary>Settings</summary>
 
-  <section class="settings">
-    <label>Input
-      <div class="seg" data-key="source">
-        <button type="button" data-v="drive">Drive</button>
-        <button type="button" data-v="sim">Simulate</button>
-      </div>
-    </label>
-    <label>Track
-      <select id="track"></select>
-    </label>
-    <label>Rotate tracks
-      <div class="seg" data-key="rotate">
-        <button type="button" data-v="off">Off</button>
-        <button type="button" data-v="3">3 min</button>
-        <button type="button" data-v="5">5 min</button>
-      </div>
-    </label>
-    <label>Highway from
-      <div class="seg" id="hwy" data-key="hwy">
-        <button type="button" data-v="low">35</button>
-        <button type="button" data-v="mid">45</button>
-        <button type="button" data-v="high">55</button>
-      </div>
-    </label>
-    <label>Units
-      <div class="seg" data-key="units">
-        <button type="button" data-v="mph">mph</button>
-        <button type="button" data-v="kmh">km/h</button>
-      </div>
-    </label>
-  </section>
+    <section class="settings">
+      <label>Input
+        <div class="seg" data-key="source">
+          <button type="button" data-v="drive">Drive</button>
+          <button type="button" data-v="sim">Simulate</button>
+        </div>
+      </label>
+      <label>Rotate tracks
+        <div class="seg" data-key="rotate">
+          <button type="button" data-v="off">Off</button>
+          <button type="button" data-v="3">3 min</button>
+          <button type="button" data-v="5">5 min</button>
+        </div>
+      </label>
+      <label>Highway from
+        <div class="seg" id="hwy" data-key="hwy">
+          <button type="button" data-v="low">35</button>
+          <button type="button" data-v="mid">45</button>
+          <button type="button" data-v="high">55</button>
+        </div>
+      </label>
+      <label>Units
+        <div class="seg" data-key="units">
+          <button type="button" data-v="mph">mph</button>
+          <button type="button" data-v="kmh">km/h</button>
+        </div>
+      </label>
+    </section>
 
-  <p class="hint">Set it up before you pull away, then leave the phone alone. The screen stays on while it plays.</p>
-  <p class="hint"><span id="version"></span> <button id="update" type="button">Check for updates</button></p>
+    <section id="sim" hidden>
+      <input id="steer" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Steering">
+      <div class="pedals">
+        <button id="brake" type="button">Brake</button>
+        <button id="gas" type="button">Gas</button>
+        <button id="floor" type="button">Floor it</button>
+      </div>
+      <p class="hint">Hold a pedal, drag to steer. Keys: arrows, and F to floor it.</p>
+    </section>
+
+    <p class="hint">Set it up before you pull away, then leave the phone alone. The screen stays on while it plays.</p>
+    <p class="hint"><span id="version"></span> <button id="update" type="button">Check for updates</button></p>
+  </details>
 </main>
 <script src="app.js"></script>
 </body>
