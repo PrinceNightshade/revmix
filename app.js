@@ -504,7 +504,8 @@ function scheduleStep(t) {
   }
 
   seq.step = (i + 1) % 16;
-  if (seq.step === 0) {
+  // While the car is stopped the music holds its chord: the story only moves when you do.
+  if (seq.step === 0 && input.speed >= 0.4) {
     seq.bar = (seq.bar + 1) % 8;
     if (seq.bar === 0) seq.cycle++;
   }
