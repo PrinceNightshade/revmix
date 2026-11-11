@@ -22,6 +22,22 @@ const TRACKS = {
     arp: [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 3, 2],
     lead: [12, null, null, 10, null, null, 7, null, 10, null, null, null, 15, null, 12, null],
   },
+  neon: { // slower and moodier: F# minor, falling progression, syncopated bass
+    name: 'Neon Coast', bpm: 96, swing: 0, root: 42,
+    prog: [{ r: 0, iv: [0, 3, 7, 10] }, { r: -2, iv: [0, 4, 7, 12] }, { r: -4, iv: [0, 4, 7, 11] }, { r: -2, iv: [0, 4, 7, 14] }],
+    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x..xx.',
+    bass: 'x..x..x.x..x..x.', bassWave: 'sawtooth', arpWave: 'sawtooth',
+    arp: [0, 1, 2, 3, null, 2, 1, 2, 0, 1, 2, 3, null, 3, 2, 1],
+    lead: [null, null, 12, null, 15, null, 12, null, 10, null, null, 7, null, null, 10, null],
+  },
+  afterglow: { // faster and brighter: B minor, rising progression, galloping bass
+    name: 'Afterglow', bpm: 112, swing: 0, root: 47,
+    prog: [{ r: -4, iv: [0, 4, 7, 11] }, { r: -2, iv: [0, 4, 7, 12] }, { r: 0, iv: [0, 3, 7, 10] }, { r: 0, iv: [0, 3, 7, 14] }],
+    kick: 'x...x...x...x...', snare: '....x.......x.x.', hat: '..x...x...x...x.',
+    bass: 'x.xxx.xxx.xxx.xx', bassWave: 'sawtooth', arpWave: 'square',
+    arp: [0, 2, 3, 2, 1, 2, 3, 2, 0, 2, 3, 2, 1, 3, 2, 3],
+    lead: [7, null, null, 10, null, 12, null, null, 15, null, 12, null, 10, null, null, null],
+  },
   sunday: {
     name: 'Sunday', bpm: 84, swing: 0.16, root: 48,
     prog: [{ r: 0, iv: [0, 4, 7, 11] }, { r: -3, iv: [0, 3, 7, 10] }, { r: 2, iv: [0, 3, 7, 10] }, { r: -5, iv: [0, 4, 7, 10] }],
