@@ -1,6 +1,7 @@
 /* Revmix — music that follows the car.
-   Speed (GPS) brings layers in, acceleration adds a riser and busier hats,
-   braking closes a filter and thins the drums, turning pans and adds echo. */
+   Speed brings the band in (all of it by 25 mph), a faster "highway" zone switches to a
+   busier groove, hard acceleration kicks that groove in early with a crash, braking closes
+   a filter, turning pans, and each compass direction has its own chord sequence. */
 
 const $ = (s) => document.querySelector(s);
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -10,75 +11,157 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
 };
 
+/* ---------- Harmony ---------- */
+const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
+// A chord is written as a scale degree (1-7). It gets a seventh on top by default;
+// "n" puts a ninth on top and "o" an octave. Result: r = semitones from the key note, iv = chord tones.
+function chord(scale, tok) {
+  const d = parseInt(tok, 10) - 1;
+  const top = tok.endsWith('n') ? 8 : tok.endsWith('o') ? 7 : 6;
+  const note = (k) => scale[k % 7] + 12 * Math.floor(k / 7);
+  let r = note(d);
+  const iv = [0, 2, 4, top].map((k) => note(d + k) - r);
+  if (r > 5) r -= 12; // keep roots near the key note so the bass stays in register
+  return { r, iv };
+}
+
 /* ---------- Tracks ---------- */
-// prog: one chord per bar, r = semitones from root, iv = chord tones.
-// Patterns are 16 steps per bar. lead = semitones above root (null = rest).
+// dirs / hwDirs: an 8-bar chord sequence for each compass direction, for the street and highway sections.
+// street / hw: 16-step drum and bass patterns for the two speed zones. Hats (x = closed, o = open) are shared.
+// arp = which chord tone to play; lead = semitones above the key note (null = rest).
+// More melodies and arp patterns are derived from these below, so each track has several to rotate through.
 const TRACKS = {
   night: {
-    name: 'Night Drive', bpm: 104, swing: 0, root: 45,
-    prog: [{ r: 0, iv: [0, 3, 7, 10] }, { r: -4, iv: [0, 4, 7, 11] }, { r: 3, iv: [0, 4, 7, 14] }, { r: -2, iv: [0, 4, 7, 10] }],
-    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x...x.',
-    bass: 'x.x.x.x.x.x.x.xx', bassWave: 'sawtooth', arpWave: 'square',
+    name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
+    dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
+    hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
+    street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
+    hw: { kick: 'x...x...x...x.x.', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'sawtooth', arpWave: 'square',
     arp: [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 3, 2],
     lead: [12, null, null, 10, null, null, 7, null, 10, null, null, null, 15, null, 12, null],
   },
-  neon: { // slower and moodier: F# minor, falling progression, syncopated bass
-    name: 'Neon Coast', bpm: 96, swing: 0, root: 42,
-    prog: [{ r: 0, iv: [0, 3, 7, 10] }, { r: -2, iv: [0, 4, 7, 12] }, { r: -4, iv: [0, 4, 7, 11] }, { r: -2, iv: [0, 4, 7, 14] }],
-    kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..x...x...x..xx.',
-    bass: 'x..x..x.x..x..x.', bassWave: 'sawtooth', arpWave: 'sawtooth',
+  neon: { // slower and moodier
+    name: 'Neon Coast', bpm: 96, swing: 0, root: 42, scale: 'minor',
+    dirs: { N: '1 7o 6 7n 1 7o 6 5', E: '6 3 7 1 6 3 4 5', S: '1 1n 4 4 6 6 7 7o', W: '4 1 6 7 4 1 3 7n' },
+    hwDirs: { N: '6 7 1 3 6 7 1 1n', E: '3 7 4 1 3 7 6 5', S: '1 6 4 5 1 6 7 7o', W: '4 5 6 3 4 5 7 1' },
+    street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' },
+    hw: { kick: 'x...x...x..xx...', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'sawtooth', arpWave: 'sawtooth',
     arp: [0, 1, 2, 3, null, 2, 1, 2, 0, 1, 2, 3, null, 3, 2, 1],
     lead: [null, null, 12, null, 15, null, 12, null, 10, null, null, 7, null, null, 10, null],
   },
-  afterglow: { // faster and brighter: B minor, rising progression, galloping bass
-    name: 'Afterglow', bpm: 112, swing: 0, root: 47,
-    prog: [{ r: -4, iv: [0, 4, 7, 11] }, { r: -2, iv: [0, 4, 7, 12] }, { r: 0, iv: [0, 3, 7, 10] }, { r: 0, iv: [0, 3, 7, 14] }],
-    kick: 'x...x...x...x...', snare: '....x.......x.x.', hat: '..x...x...x...x.',
-    bass: 'x.xxx.xxx.xxx.xx', bassWave: 'sawtooth', arpWave: 'square',
+  afterglow: { // faster and brighter
+    name: 'Afterglow', bpm: 112, swing: 0, root: 47, scale: 'minor',
+    dirs: { N: '6 7o 1 1n 6 7o 3 3n', E: '1 3 7 4 1 3 6 7', S: '4 5 1 1n 4 5 6 7', W: '6 4 1 7o 6 4 3 5' },
+    hwDirs: { N: '3 4 6 7 3 4 1 1n', E: '1 7 6 7o 1 7 6 5', S: '6 3 4 1 6 3 7 7o', W: '4 6 7 1 4 6 7 3' },
+    street: { kick: 'x...x...x...x...', snare: '....x.......x.x.', hat: '..o...o...o...o.', bass: 'x.xxx.xxx.xxx.xx' },
+    hw: { kick: 'x...x...x...x..x', snare: '....x.......x.xx', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'sawtooth', arpWave: 'square',
     arp: [0, 2, 3, 2, 1, 2, 3, 2, 0, 2, 3, 2, 1, 3, 2, 3],
     lead: [7, null, null, 10, null, 12, null, null, 15, null, 12, null, 10, null, null, null],
   },
   sunday: {
-    name: 'Sunday', bpm: 84, swing: 0.16, root: 48,
-    prog: [{ r: 0, iv: [0, 4, 7, 11] }, { r: -3, iv: [0, 3, 7, 10] }, { r: 2, iv: [0, 3, 7, 10] }, { r: -5, iv: [0, 4, 7, 10] }],
-    kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.',
-    bass: 'x......x..x...x.', bassWave: 'triangle', arpWave: 'triangle',
+    name: 'Sunday', bpm: 84, swing: 0.16, root: 48, scale: 'major',
+    dirs: { N: '1 6 2 5 3 6 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 5 1n 4' },
+    hwDirs: { N: '4 3 2 1 4 3 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '2 3 4 5 6 5 4 5' },
+    street: { kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x......x..x...x.' },
+    hw: { kick: 'x..x...x..x..x..', snare: '....x..x....x...', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'triangle', arpWave: 'triangle',
     arp: [0, null, 2, null, 3, null, 1, null, 2, null, 3, null, 1, null, 2, null],
     lead: [16, null, null, null, 14, null, 12, null, null, null, 9, null, null, null, 7, null],
   },
   autobahn: {
-    name: 'Autobahn', bpm: 128, swing: 0, root: 43,
-    prog: [{ r: 0, iv: [0, 3, 7, 10] }, { r: -4, iv: [0, 4, 7, 11] }, { r: 3, iv: [0, 4, 7, 12] }, { r: -2, iv: [0, 4, 7, 12] }],
-    kick: 'x...x...x...x...', snare: '....x.......x..x', hat: '..x...x...x...x.',
-    bass: '.xxx.xxx.xxx.xxx', bassWave: 'sawtooth', arpWave: 'sawtooth',
+    name: 'Autobahn', bpm: 128, swing: 0, root: 43, scale: 'minor',
+    dirs: { N: '1 6 3o 7o 1 6 4 5', E: '1 1 6 6 1 1 7 7', S: '4 4 1 1 6 6 5 5', W: '6 7 1 3 6 7 1 5' },
+    hwDirs: { N: '6 6 7 7 1 1 3 3', E: '3 7 1 6 3 7 4 4', S: '1 4 7 3 6 4 5 5', W: '4 6 1 5 4 6 7 7o' },
+    street: { kick: 'x...x...x...x...', snare: '....x.......x..x', hat: '..o...o...o...o.', bass: '.xxx.xxx.xxx.xxx' },
+    hw: { kick: 'x...x...x...x.xx', snare: '....x.......x..x', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'sawtooth', arpWave: 'sawtooth',
     arp: [0, 2, 1, 3, 0, 2, 1, 3, 0, 2, 1, 3, 0, 3, 2, 1],
     lead: [12, null, 12, null, null, 15, null, null, 10, null, 10, null, null, 7, null, null],
   },
 };
-const LAYERS = ['pad', 'bass', 'kick', 'hats', 'snare', 'arp', 'lead'];
-const THRESH = { pad: -1, bass: 0.06, kick: 0.16, hats: 0.3, snare: 0.44, arp: 0.6, lead: 0.8 };
-const VOL = { pad: 0.22, bass: 0.5, kick: 0.9, hats: 0.28, snare: 0.5, arp: 0.2, lead: 0.22 };
-const RANGES = { city: 18, mixed: 27, highway: 36 }; // m/s at which everything is in (~40/60/80 mph)
+const DIRS = ['N', 'E', 'S', 'W'];
+const PENT = { minor: [0, 3, 5, 7, 10], major: [0, 2, 4, 7, 9] }; // five-note scales that sit well over every chord
+const RHYTHMS = ['x..x..x.x...x.x.', 'x.....x.x..x....', '..x.x..x..x...x.', 'x..x....x..x..x.', 'x.x...x...x.x...', '....x.x.x.....x.'];
+
+// Writes a one-bar melody: picks a rhythm, then walks up and down the five-note scale in small steps
+// and lands on a restful note. The same seed always gives the same melody.
+function makePhrase(pent, seed, high) {
+  let x = seed >>> 0;
+  const rnd = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+  const ladder = [...pent, ...pent.map((n) => n + 12), 24];
+  const lo = high ? 4 : 2, hi = high ? 8 : 7;
+  const rhythm = RHYTHMS[Math.floor(rnd() * RHYTHMS.length)];
+  let pos = lo + 1 + Math.floor(rnd() * 3), last = -1;
+  const out = [];
+  for (let i = 0; i < 16; i++) {
+    if (rhythm[i] !== 'x') { out.push(null); continue; }
+    out.push(ladder[pos]); last = i;
+    const r = rnd();
+    pos = clamp(pos + (r < 0.4 ? -1 : r < 0.8 ? 1 : r < 0.9 ? -2 : 2), lo, hi);
+  }
+  const rest = ladder.filter((n, k) => k >= lo && k <= hi && (n % 12 === 0 || n % 12 === 7));
+  out[last] = rest.reduce((a, b) => (Math.abs(b - out[last]) < Math.abs(a - out[last]) ? b : a));
+  return out;
+}
+
+for (const [id, tr] of Object.entries(TRACKS)) {
+  const chords = (seqs) => Object.fromEntries(DIRS.map((d) => [d, seqs[d].split(' ').map((tok) => chord(SCALES[tr.scale], tok))]));
+  tr.prog = { street: chords(tr.dirs), highway: chords(tr.hwDirs) };
+  const seed = [...id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7);
+  const pent = PENT[tr.scale];
+  tr.leads = {
+    street: [tr.lead, ...[1, 2, 3].map((n) => makePhrase(pent, seed + n * 977, false))],
+    highway: [1, 2, 3, 4].map((n) => makePhrase(pent, seed + 5000 + n * 613, true)),
+  };
+  tr.arps = [tr.arp, [...tr.arp].reverse(), [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 2, 1, 3]];
+}
+const ROTATE = { off: 0, 3: 3, 5: 5 }; // minutes before moving to the next track
+// Each compass direction has a signature sound. Their volumes follow the heading, so NE is half N, half E.
+const DIR_SOUND = { N: 'glass', E: 'pluck', S: 'drone', W: 'strings' };
+const DIR_VOL = { N: 0.2, E: 0.2, S: 0.26, W: 0.11 };
+const E_PLUCK = 'x..x..x..x.x..x.';
+const STAB = '...x..x...x..x..';
+
+const LAYERS = ['pad', 'bass', 'kick', 'hats', 'snare', 'arp', 'lead', 'stabs'];
+// Speed in mph at which each layer joins. Everything is in by 25 mph.
+const JOIN = { pad: -99, bass: 3, kick: 7, hats: 11, snare: 15, arp: 19, lead: 23 };
+const VOL = { pad: 0.22, bass: 0.5, kick: 0.9, hats: 0.28, snare: 0.5, arp: 0.2, lead: 0.22, stabs: 0.2 };
+const HWY = { low: 15.6, mid: 20.1, high: 24.6 }; // m/s where the highway zone starts (~35/45/55 mph)
+const HWY_LABEL = { mph: { low: '35', mid: '45', high: '55' }, kmh: { low: '55', mid: '70', high: '90' } };
 
 /* ---------- Settings & state ---------- */
 const settings = {
   track: store.get('rm.track', 'night'),
-  range: store.get('rm.range', 'mixed'),
+  hwy: store.get('rm.hwy', 'mid'),
   units: store.get('rm.units', 'mph'),
   source: store.get('rm.source', 'drive'),
+  rotate: store.get('rm.rotate', '5'),
 };
 if (!TRACKS[settings.track]) settings.track = 'night';
-if (!RANGES[settings.range]) settings.range = 'mixed';
+if (!HWY[settings.hwy]) settings.hwy = 'mid';
+if (!(settings.rotate in ROTATE)) settings.rotate = '5';
 
-// What the music listens to. speed in m/s, long in g (+ = accelerating), turn in deg/s (+ = right).
-const input = { speed: 0, long: 0, turn: 0 };
-const mix = { intensity: 0, boost: 0, brake: 0, level: Object.fromEntries(LAYERS.map((l) => [l, 0])) };
+// What the music listens to. speed in m/s, long in g (+ = accelerating), turn in deg/s (+ = right),
+// heading in degrees clockwise from north (null until known).
+const input = { speed: 0, long: 0, turn: 0, heading: null };
+const mix = {
+  intensity: 0, boost: 0, brake: 0, surge: 0, bright: 0,
+  zoneWant: 'street', dirWant: 'N',
+  dirW: { N: 0, E: 0, S: 0, W: 0 }, // how much of each compass sound is in the mix
+  level: Object.fromEntries(LAYERS.map((l) => [l, 0])),
+};
 let running = false;
 let statusText = 'Ready';
 
 /* ---------- Audio ---------- */
 let ctx, A; // A = audio nodes
-let step = 0, nextTime = 0, schedTimer = null, ctlTimer = null;
+// Sequencer position: step 0-15 in the bar, bar 0-7 in the chord sequence, cycle = sequences played.
+// zone and dir only change on a bar line, so switches land in time.
+const seq = { step: 0, bar: 0, cycle: 0, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0 };
+let nextTime = 0, schedTimer = null, ctlTimer = null;
 
 function buildAudio() {
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -99,14 +182,18 @@ function buildAudio() {
   const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
   pan.connect(lp); pan.connect(delay);
 
+  // Pad and stabs pass through "duck", which dips on every kick for a pumping feel.
+  const duck = ctx.createGain(); duck.connect(lp);
+  const fx = ctx.createGain(); fx.gain.value = 0.5; fx.connect(lp); // crashes and impacts
+
   const layer = {};
   for (const name of LAYERS) {
     const g = ctx.createGain(); g.gain.value = 0;
-    g.connect(name === 'arp' || name === 'lead' || name === 'hats' ? pan : lp);
+    g.connect(name === 'arp' || name === 'lead' || name === 'hats' ? pan : name === 'pad' || name === 'stabs' ? duck : lp);
     layer[name] = g;
   }
 
-  const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const d = noise.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
 
@@ -123,27 +210,78 @@ function buildAudio() {
     }
   }
 
-  // Riser: filtered noise that swells under hard acceleration.
-  const riserSrc = ctx.createBufferSource(); riserSrc.buffer = noise; riserSrc.loop = true;
-  const riserBp = ctx.createBiquadFilter(); riserBp.type = 'bandpass'; riserBp.frequency.value = 800; riserBp.Q.value = 2;
-  const riser = ctx.createGain(); riser.gain.value = 0;
-  riserSrc.connect(riserBp); riserBp.connect(riser); riser.connect(lp); riserSrc.start();
+  // Compass sounds. N: bell notes into the main echo. E: short plucks into their own quick, bouncing echo.
+  // S: a low drone. W: a wide wash of detuned strings. The drone and strings run all the time and are retuned per chord.
+  const dirGain = {};
+  for (const d of DIRS) { const g = ctx.createGain(); g.gain.value = 0; g.connect(lp); dirGain[d] = g; }
+  dirGain.N.connect(delay);
+  const eDelay = ctx.createDelay(1), eFb = ctx.createGain(); eFb.gain.value = 0.5;
+  dirGain.E.connect(eDelay); eDelay.connect(eFb); eFb.connect(eDelay); eDelay.connect(lp);
 
-  A = { master, lp, analyser, delay, fb, pan, layer, noise, padFilter, padOsc, riserBp, riser };
+  const droneLp = ctx.createBiquadFilter(); droneLp.type = 'lowpass'; droneLp.frequency.value = 320; droneLp.connect(dirGain.S);
+  const drone = [['sine', -12, 0.5], ['sawtooth', 0, 0.3], ['sawtooth', 0.08, 0.3]].map(([type, semis, vol]) => {
+    const o = ctx.createOscillator(); o.type = type;
+    const g = ctx.createGain(); g.gain.value = vol;
+    o.connect(g); g.connect(droneLp); o.start();
+    return { o, semis };
+  });
+
+  const stringLp = ctx.createBiquadFilter(); stringLp.type = 'lowpass'; stringLp.frequency.value = 1500; stringLp.connect(dirGain.W);
+  const strings = [];
+  for (let v = 0; v < 3; v++) {
+    for (const side of [-1, 1]) {
+      const o = ctx.createOscillator(); o.type = 'sawtooth'; o.detune.value = side * 14;
+      const g = ctx.createGain(); g.gain.value = 0.2;
+      o.connect(g);
+      if (ctx.createStereoPanner) { const sp = ctx.createStereoPanner(); sp.pan.value = side * 0.8; g.connect(sp); sp.connect(stringLp); }
+      else g.connect(stringLp);
+      o.start();
+      strings.push({ o, v });
+    }
+  }
+
+  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, dirGain, eDelay, drone, strings };
 }
+
+const currentChord = () => TRACKS[settings.track].prog[seq.zone][seq.dir][seq.bar];
 
 function setPadChord(chord, t) {
   const tr = TRACKS[settings.track];
   for (const { o, v } of A.padOsc) {
-    o.frequency.setTargetAtTime(mtof(tr.root + 12 + chord.r + chord.iv[v]), t, 0.06);
+    // Every other pass through the sequence, the lowest voice moves up an octave for a different colour.
+    const lift = (seq.cycle & 1) && v === 0 ? 12 : 0;
+    o.frequency.setTargetAtTime(mtof(tr.root + 12 + chord.r + chord.iv[v] + lift), t, 0.06);
+  }
+  for (const { o, semis } of A.drone) o.frequency.setTargetAtTime(mtof(tr.root + chord.r + semis), t, 0.12);
+  for (const { o, v } of A.strings) o.frequency.setTargetAtTime(mtof(tr.root + 24 + chord.r + chord.iv[v]), t, 0.1);
+}
+
+// North's bell: a pure tone with a fainter, higher ring on top.
+function bell(t, midi, vol) {
+  for (const [mult, v, dur] of [[1, vol, 1.4], [2.76, vol * 0.35, 0.7]]) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = mtof(midi) * mult;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(A.dirGain.N); o.start(t); o.stop(t + dur + 0.02);
   }
 }
 
-function kick(t) {
+function setTempoFx(t) {
+  const beat = 60 / TRACKS[settings.track].bpm;
+  A.delay.delayTime.setTargetAtTime(beat * 0.75, t, 0.05);
+  A.eDelay.delayTime.setTargetAtTime(beat * 0.5, t, 0.05);
+}
+
+// punch (0-1) is how hard the car is accelerating: a sharper attack, a click on top and a longer tail.
+function kick(t, pump, punch) {
   const o = ctx.createOscillator(), g = ctx.createGain();
-  o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
-  g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-  o.connect(g); g.connect(A.layer.kick); o.start(t); o.stop(t + 0.35);
+  const tail = 0.32 + 0.14 * punch;
+  o.frequency.setValueAtTime(150 + 70 * punch, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  g.gain.setValueAtTime(1, t); g.gain.exponentialRampToValueAtTime(0.001, t + tail);
+  o.connect(g); g.connect(A.layer.kick); o.start(t); o.stop(t + tail + 0.03);
+  if (punch > 0.2) noiseHit(t, A.layer.kick, 'highpass', 2500, 0.02, 0.5 * punch);
+  A.duck.gain.setValueAtTime(1 - pump, t); A.duck.gain.linearRampToValueAtTime(1, t + 0.22);
 }
 
 function noiseHit(t, out, type, freq, dur, vol) {
@@ -152,11 +290,11 @@ function noiseHit(t, out, type, freq, dur, vol) {
   const g = ctx.createGain();
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   s.connect(f); f.connect(g); g.connect(out);
-  s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+  s.start(t, Math.random() * 0.3); s.stop(t + dur + 0.02);
 }
 
-function pluck(t, out, midi, wave, dur, vol, cutoff) {
-  const o = ctx.createOscillator(); o.type = wave; o.frequency.value = mtof(midi);
+function pluck(t, out, midi, wave, dur, vol, cutoff, detune = 0) {
+  const o = ctx.createOscillator(); o.type = wave; o.frequency.value = mtof(midi); o.detune.value = detune;
   const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
   f.frequency.setValueAtTime(cutoff, t); f.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.25), t + dur);
   const g = ctx.createGain();
@@ -165,32 +303,132 @@ function pluck(t, out, midi, wave, dur, vol, cutoff) {
   o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
 
-function scheduleStep(s, t) {
-  const tr = TRACKS[settings.track];
-  const bar = s >> 4, i = s & 15;
-  const chord = tr.prog[bar % tr.prog.length];
-  const L = mix.level, I = mix.intensity;
-  const s16 = 60 / tr.bpm / 4;
+function snareHit(t, vol) {
+  noiseHit(t, A.layer.snare, 'bandpass', 1800, 0.18, 0.9 * vol);
+  pluck(t, A.layer.snare, 55, 'triangle', 0.1, 0.5 * vol, 900);
+}
 
-  if (i === 0) setPadChord(chord, t);
-  if (L.kick > 0.01 && tr.kick[i] === 'x') kick(t);
-  if (L.snare > 0.01 && tr.snare[i] === 'x') {
-    noiseHit(t, A.layer.snare, 'bandpass', 1800, 0.18, 0.9);
-    pluck(t, A.layer.snare, 55, 'triangle', 0.1, 0.5, 900);
+function tom(t, hz) {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.setValueAtTime(hz * 1.5, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.08);
+  g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+  o.connect(g); g.connect(A.layer.snare); o.start(t); o.stop(t + 0.26);
+}
+
+// Crash cymbal plus a low thump: marks a hard launch, a new section or a new track.
+function crash(t, vol = 1) {
+  noiseHit(t, A.fx, 'highpass', 4500, 1.8, 0.7 * vol);
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.5);
+  g.gain.setValueAtTime(0.9 * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+  o.connect(g); g.connect(A.fx); o.start(t); o.stop(t + 1);
+}
+
+function nextTrack(t) {
+  const ids = Object.keys(TRACKS);
+  settings.track = ids[(ids.indexOf(settings.track) + 1) % ids.length]; // not saved: the chosen track is still the starting point
+  seq.trackStart = t; seq.cycle = 0;
+  setTempoFx(t);
+  crash(t, 0.6);
+}
+
+function scheduleStep(t) {
+  let tr = TRACKS[settings.track];
+  const i = seq.step;
+
+  if (i === 0) {
+    // Section changes land on a bar line. A new direction or zone restarts the 8-bar chord sequence.
+    const zoned = seq.zone !== mix.zoneWant;
+    if (zoned || seq.dir !== mix.dirWant) {
+      seq.dir = mix.dirWant; seq.zone = mix.zoneWant;
+      if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
+      if (seq.cycle % 8 === 6) seq.cycle++; // never open a new section with a breakdown
+      if (zoned && seq.zone === 'highway') crash(t);
+    }
+    if (seq.bar === 0) {
+      const mins = ROTATE[settings.rotate];
+      if (mins && t - seq.trackStart > mins * 60) { nextTrack(t); tr = TRACKS[settings.track]; }
+      else if (seq.cycle % 8 === 7 && mix.level.snare > 0.5) crash(t, 0.6); // the band returns after a breakdown
+    }
+    setPadChord(currentChord(), t);
+  }
+  if (seq.launch) { seq.launch = false; crash(t); }
+
+  const chord = currentChord();
+  const L = mix.level, I = mix.intensity, surge = mix.surge;
+  const s16 = 60 / tr.bpm / 4;
+  const highway = seq.zone === 'highway';
+  const driving = highway || surge > 0.5; // the busier groove
+  const g = driving ? tr.hw : tr.street;
+  const bright = 1 + 0.3 * mix.bright;
+
+  // The long-form shape: every 8 passes through the chords (64 bars) the music goes
+  // melody A, melody B, no melody, melody C, ... then a breakdown and a build back in.
+  const form = seq.cycle % 8;
+  const calm = surge < 0.3; // never interrupt hard acceleration
+  const breakdown = form === 6 && seq.bar < 4 && calm;  // drums and bass drop out for four bars
+  const build = form === 6 && seq.bar === 7 && calm;    // a snare build brings them back
+  const fill = seq.bar === 7 && i >= 12 && surge <= 0.5 && !build && L.snare > 0.01; // drum fill ending each sequence
+  const fillKind = seq.cycle % 3;
+
+  if (L.kick > 0.01 && !breakdown) {
+    const hit = fill && fillKind === 1 ? i < 14 : fill && fillKind === 2 ? false : g.kick[i] === 'x';
+    if (hit) kick(t, 0.12 + 0.45 * Math.max(surge, highway ? 0.6 : 0), surge);
+  }
+  if (L.snare > 0.01 && !breakdown) {
+    if (build) { if (i % 4 === 0 || (i >= 8 && i % 2 === 0) || i >= 12) snareHit(t, 0.3 + 0.045 * i); }
+    else if (fill) {
+      if (fillKind === 0) snareHit(t, 0.4 + 0.16 * (i - 12));         // snare run
+      else if (fillKind === 1) { if (i >= 14) snareHit(t, i === 15 ? 1 : 0.7); } // two kicks, two snares
+      else tom(t, [220, 180, 140, 110][i - 12]);                       // toms falling
+    }
+    else if (g.snare[i] === 'x') snareHit(t, 1);
+    else if (surge > 0.5 && (seq.bar & 1) && i >= 12) snareHit(t, 0.35 + 0.15 * (i - 12)); // roll into the next bar
   }
   if (L.hats > 0.01) {
-    const busy = mix.boost > 0.35 || I > 0.92; // 16th-note hats when pushing on
-    if (tr.hat[i] === 'x') noiseHit(t, A.layer.hats, 'highpass', 7500, i % 4 === 2 ? 0.09 : 0.04, 0.8);
-    else if (busy) noiseHit(t, A.layer.hats, 'highpass', 9000, 0.03, 0.4);
+    const h = tr.street.hat[i]; // hats keep the same pace in every zone, so the song never seems to speed up
+    if (h === 'o') noiseHit(t, A.layer.hats, 'highpass', 7500, 0.1, 0.8);
+    else if (h === 'x' && !breakdown) noiseHit(t, A.layer.hats, 'highpass', 7500, 0.04, 0.8);
   }
-  if (L.bass > 0.01 && tr.bass[i] === 'x') {
-    pluck(t, A.layer.bass, tr.root - 12 + chord.r, tr.bassWave, s16 * 1.7, 0.9, 500 + I * 1800);
+  if (L.bass > 0.01 && g.bass[i] === 'x' && !breakdown) {
+    // Driving groove: steady eighth notes, low on the beat and an octave up in between, with a brighter bite.
+    const bounce = driving && i % 4 === 2 ? 12 : 0;
+    pluck(t, A.layer.bass, tr.root - 12 + chord.r + bounce, tr.bassWave, s16 * 1.7, driving ? 1 : 0.9, (500 + I * 1800) * (driving ? 1.6 : 1));
+    // Under acceleration a second, hollower voice doubles the bass to thicken it.
+    if (surge > 0.3) pluck(t, A.layer.bass, tr.root - 12 + chord.r + bounce, 'square', s16 * 1.7, 0.45 * surge, 900 + 1400 * surge);
   }
-  if (L.arp > 0.01 && tr.arp[i] != null) {
-    pluck(t, A.layer.arp, tr.root + 24 + chord.r + chord.iv[tr.arp[i]], tr.arpWave, s16 * 1.4, 0.7, 1200 + I * 3000);
+  // Arp pattern changes every pass, and again halfway through.
+  const ai = tr.arps[(seq.cycle + (seq.bar >= 4 ? 1 : 0)) % tr.arps.length][i];
+  if (L.arp > 0.01 && ai != null) {
+    pluck(t, A.layer.arp, tr.root + 24 + chord.r + chord.iv[ai], tr.arpWave, s16 * 1.4, 0.7, (1200 + I * 3000) * bright);
   }
-  if (L.lead > 0.01 && tr.lead[i] != null && (bar & 1) === 0) {
-    pluck(t, A.layer.lead, tr.root + 24 + tr.lead[i], 'sawtooth', s16 * 3.5, 0.7, 2600);
+  // Lead: the highway has its own melodies, trading two phrases bar by bar with a thicker sound.
+  // The street plays one phrase every other bar, then answers with the next phrase in the second half.
+  const leads = tr.leads[seq.zone];
+  const ln = leads[(seq.cycle + (highway ? seq.bar & 1 : seq.bar >= 4 ? 1 : 0)) % leads.length][i];
+  if (L.lead > 0.01 && ln != null && form !== 2 && (driving || (seq.bar & 1) === 0)) {
+    pluck(t, A.layer.lead, tr.root + 24 + ln, 'sawtooth', s16 * 3.5, 0.7, 2600 * bright);
+    if (highway) pluck(t, A.layer.lead, tr.root + 24 + ln, 'sawtooth', s16 * 3.5, 0.45, 2600 * bright, 14);
+  }
+  if (L.stabs > 0.01 && STAB[i] === 'x' && !breakdown) {
+    for (let v = 0; v < 3; v++) {
+      pluck(t, A.layer.stabs, tr.root + 24 + chord.r + chord.iv[v], 'sawtooth', s16 * 1.8, 0.45, 3500 * bright);
+    }
+  }
+
+  // Compass sounds that are played as notes (the drone and strings sound continuously).
+  if (mix.dirW.N > 0.03) {
+    const k = [0, 6, 11].indexOf(i);
+    if (k >= 0) bell(t, tr.root + 36 + chord.r + chord.iv[[3, 1, 2][k]], 0.5);
+  }
+  if (mix.dirW.E > 0.03 && E_PLUCK[i] === 'x') {
+    pluck(t, A.dirGain.E, tr.root + 24 + chord.r + chord.iv[[0, 2, 1, 3][(i + seq.bar) % 4]], 'triangle', s16 * 0.9, 0.8, 3200);
+  }
+
+  seq.step = (i + 1) % 16;
+  if (seq.step === 0) {
+    seq.bar = (seq.bar + 1) % 8;
+    if (seq.bar === 0) seq.cycle++;
   }
 }
 
@@ -198,30 +436,38 @@ function scheduler() {
   const tr = TRACKS[settings.track];
   if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.05; // recover after a stall
   while (nextTime < ctx.currentTime + 0.15) {
-    scheduleStep(step, nextTime);
-    const s16 = 60 / tr.bpm / 4;
-    nextTime += s16 * (step % 2 === 0 ? 1 + tr.swing : 1 - tr.swing);
-    step = (step + 1) % 64;
+    const even = seq.step % 2 === 0;
+    scheduleStep(nextTime);
+    nextTime += (60 / tr.bpm / 4) * (even ? 1 + tr.swing : 1 - tr.swing);
   }
 }
 
 /* ---------- Sensors ---------- */
 const IOS = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function';
-const gps = { target: 0, long: 0, lastV: null, lastT: 0, lastPos: null, fixAt: 0, acc: null, denied: false };
+const gps = { target: 0, long: 0, lastV: null, lastT: 0, lastPos: null, anchor: null, heading: null, fixAt: 0, acc: null, denied: false };
 const motion = { turn: 0, horiz: 0, seen: false, grav: null };
 let geoId = null, wakeLock = null;
+const RAD = Math.PI / 180;
 
 function haversine(a, b) {
-  const R = 6371000, rad = Math.PI / 180;
-  const dLat = (b.latitude - a.latitude) * rad, dLon = (b.longitude - a.longitude) * rad;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * rad) * Math.cos(b.latitude * rad) * Math.sin(dLon / 2) ** 2;
+  const R = 6371000;
+  const dLat = (b.latitude - a.latitude) * RAD, dLon = (b.longitude - a.longitude) * RAD;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.latitude * RAD) * Math.cos(b.latitude * RAD) * Math.sin(dLon / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function bearing(a, b) {
+  const y = Math.sin((b.longitude - a.longitude) * RAD) * Math.cos(b.latitude * RAD);
+  const x = Math.cos(a.latitude * RAD) * Math.sin(b.latitude * RAD)
+    - Math.sin(a.latitude * RAD) * Math.cos(b.latitude * RAD) * Math.cos((b.longitude - a.longitude) * RAD);
+  return (Math.atan2(y, x) / RAD + 360) % 360;
 }
 
 function onPosition(p) {
   const c = p.coords, t = p.timestamp;
   gps.fixAt = performance.now(); gps.acc = c.accuracy; gps.denied = false;
   if (c.accuracy > 60) return; // too vague to trust
+  const here = { latitude: c.latitude, longitude: c.longitude, t };
   let v = c.speed;
   if (v == null || Number.isNaN(v) || v < 0) {
     // No speed from the device: estimate from distance moved.
@@ -230,9 +476,20 @@ function onPosition(p) {
       const dt = (t - gps.lastPos.t) / 1000, dist = haversine(gps.lastPos, c);
       if (dt > 0.3) v = dist < 3 ? 0 : dist / dt;
     }
-    gps.lastPos = { latitude: c.latitude, longitude: c.longitude, t };
-    if (v == null) return;
   }
+  gps.lastPos = here;
+  if (v == null) return;
+
+  // Direction of travel: the device's own heading when it gives one, else the bearing over the last 12 m.
+  let h = null;
+  if (c.heading != null && !Number.isNaN(c.heading) && c.heading >= 0 && v > 2) h = c.heading;
+  if (!gps.anchor) gps.anchor = here;
+  else if (haversine(gps.anchor, here) > 12) { if (h == null) h = bearing(gps.anchor, here); gps.anchor = here; }
+  if (h != null) {
+    if (gps.heading == null) gps.heading = h;
+    else gps.heading = (gps.heading + (((h - gps.heading + 540) % 360) - 180) * 0.5 + 360) % 360;
+  }
+
   if (gps.lastV != null) {
     const dt = (t - gps.lastT) / 1000;
     if (dt > 0.2 && dt < 5) gps.long += ((v - gps.lastV) / dt / 9.81 - gps.long) * 0.5;
@@ -291,7 +548,7 @@ function stopSensors() {
   removeEventListener('devicemotion', onMotion);
   if (geoId != null) navigator.geolocation.clearWatch(geoId);
   geoId = null;
-  Object.assign(gps, { target: 0, long: 0, lastV: null, lastPos: null, fixAt: 0, acc: null });
+  Object.assign(gps, { target: 0, long: 0, lastV: null, lastPos: null, anchor: null, heading: null, fixAt: 0, acc: null });
   Object.assign(motion, { turn: 0, horiz: 0, seen: false, grav: null });
 }
 
@@ -301,12 +558,13 @@ async function holdWake() {
 }
 
 /* ---------- Simulator ---------- */
-const sim = { gas: false, brake: false, steer: 0, v: 0 };
+const sim = { gas: false, floor: false, brake: false, steer: 0, v: 0, heading: 0 };
 
 function simStep(dt) {
   let a;
   if (sim.brake) a = -6.5;
-  else if (sim.gas) a = 3.4 * (1 - sim.v / 45);
+  else if (sim.floor) a = 3.6 * (1 - sim.v / 50); // foot down
+  else if (sim.gas) a = 1.3 * (1 - sim.v / 50);   // gentle
   else a = -0.25 - 0.012 * sim.v;
   const before = sim.v;
   sim.v = Math.max(0, sim.v + a * dt);
@@ -314,43 +572,89 @@ function simStep(dt) {
   input.speed = sim.v;
   input.long += (real - input.long) * 0.3;
   input.turn = sim.v > 1 ? sim.steer * 28 : 0;
+  sim.heading = (sim.heading + input.turn * dt + 360) % 360;
+  input.heading = sim.heading;
 }
 
 function driveStep(dt) {
   input.speed += (gps.target - input.speed) * Math.min(1, dt * 2.5);
   if (input.speed < 0.3 && gps.target === 0) input.speed = 0;
-  let turn = Math.abs(motion.turn) > 1.5 && input.speed > 1 ? motion.turn : 0;
+  const turn = Math.abs(motion.turn) > 1.5 && input.speed > 1 ? motion.turn : 0;
   // The accelerometer reacts faster than GPS; GPS says whether it is speeding up or slowing down.
-  const lat = (input.speed * turn * Math.PI / 180) / 9.81;
+  const lat = (input.speed * turn * RAD) / 9.81;
   const fwd = Math.sqrt(Math.max(0, motion.horiz ** 2 - lat ** 2));
   let long = gps.long;
   if (Math.abs(long) > 0.03) long = Math.sign(long) * Math.max(Math.abs(long), Math.min(fwd, 0.6));
   if (performance.now() - gps.fixAt > 4000) long = 0;
   input.long += (long - input.long) * Math.min(1, dt * 4);
   input.turn = turn;
+  input.heading = gps.heading;
 }
 
 /* ---------- Mixing: inputs -> sound ---------- */
+// Stay with the current direction until the heading is clearly inside another quarter.
+function pickDir(h, cur) {
+  const off = Math.abs(((h - DIRS.indexOf(cur) * 90 + 540) % 360) - 180);
+  return off <= 55 ? cur : DIRS[Math.round(h / 90) % 4];
+}
+
 function control() {
-  const dt = 0.05;
+  const dt = 0.05, now = performance.now();
   if (settings.source === 'sim') simStep(dt); else driveStep(dt);
 
-  const sp = clamp(input.speed / RANGES[settings.range]);
+  const moving = input.speed >= 0.4;
   const boost = clamp(input.long / 0.25), brake = clamp(-input.long / 0.3);
-  const I = input.speed < 0.4 ? 0 : clamp(Math.pow(sp, 0.75) + boost * 0.25 - brake * 0.15);
-  mix.intensity = I; mix.boost = boost; mix.brake = brake;
+  mix.boost = boost; mix.brake = brake;
+
+  // Surge: hard acceleration. Rises fast, lets go slowly so a gear change doesn't cut it off.
+  const surgeTarget = moving ? clamp((input.long - 0.1) / 0.15) : 0;
+  const was = mix.surge;
+  mix.surge += (surgeTarget - mix.surge) * (surgeTarget > mix.surge ? 0.3 : 0.03);
+  if (was < 0.6 && mix.surge >= 0.6 && now - seq.lastLaunch > 8000) { seq.launch = true; seq.lastLaunch = now; }
+  const surge = mix.surge;
+
+  // Zone: street or highway, with a gap between the two thresholds so it doesn't flicker.
+  const hwy = HWY[settings.hwy];
+  if (mix.zoneWant === 'street' && input.speed > hwy) mix.zoneWant = 'highway';
+  else if (mix.zoneWant === 'highway' && input.speed < hwy * 0.85) mix.zoneWant = 'street';
+  const highway = mix.zoneWant === 'highway';
+
+  // Compass: pick the chord sequence, and lean brighter heading north, darker heading south.
+  if (input.heading != null) {
+    mix.dirWant = pickDir(input.heading, mix.dirWant);
+    mix.bright += (Math.cos(input.heading * RAD) - mix.bright) * 0.05;
+  }
+
+  const eff = Math.max(0, input.speed + boost * 2 - brake * 1.5); // m/s, nudged by the pedals
+  const mph = moving ? eff * 2.23694 : 0;
+
+  // Compass sounds: each one's share is cos² of how far the heading is from its direction,
+  // so two neighbours always add up to a whole and fade smoothly into each other. They fade in over the first 8 mph.
+  const presence = clamp(mph / 8);
+  DIRS.forEach((d, k) => {
+    const c = input.heading == null ? 0 : Math.max(0, Math.cos((input.heading - k * 90) * RAD));
+    mix.dirW[d] += (c * c * presence - mix.dirW[d]) * 0.08;
+    A.dirGain[d].gain.setTargetAtTime(mix.dirW[d] * DIR_VOL[d], ctx.currentTime, 0.3);
+  });
+  let I = highway ? 0.75 + 0.25 * clamp((input.speed - hwy) / (hwy * 0.5)) : 0.65 * clamp(eff / 11.2);
+  I = moving ? clamp(I + surge * 0.15) : 0;
+  mix.intensity = I;
 
   const t = ctx.currentTime;
   for (const name of LAYERS) {
-    let lv = clamp((I - THRESH[name]) / 0.08);
+    let lv = name === 'stabs' ? (highway ? 1 : clamp((surge - 0.3) / 0.4)) : clamp((mph - JOIN[name]) / 3);
+    if (name === 'bass' || name === 'kick' || name === 'hats' || name === 'snare') lv = Math.max(lv, surge); // surge brings the beat in early
     if (name === 'kick' || name === 'hats' || name === 'snare') lv *= 1 - brake * 0.85; // drums thin out under braking
+    if (!moving && name !== 'pad') lv = 0;
     mix.level[name] = lv;
-    A.layer[name].gain.setTargetAtTime(lv * VOL[name], t, 0.18);
+    // Under acceleration the kick and bass step forward and the melodic layers step back to make room.
+    const focus = name === 'kick' || name === 'bass' ? 1 + 0.4 * surge : name === 'pad' || name === 'arp' || name === 'lead' ? 1 - 0.3 * surge : 1;
+    A.layer[name].gain.setTargetAtTime(lv * VOL[name] * focus, t, 0.18);
   }
-  A.padFilter.frequency.setTargetAtTime(280 + 3200 * I, t, 0.3);
+  const drift = 1 + 0.25 * Math.sin(now / 1000 * 2 * Math.PI * 0.05); // slow sweep so a held chord still moves
+  A.padFilter.frequency.setTargetAtTime((280 + 3200 * I) * drift * (1 + 0.3 * mix.bright), t, 0.3);
+  A.wet.gain.setTargetAtTime(0.28 - 0.1 * mix.bright, t, 0.5);
   A.lp.frequency.setTargetAtTime(18000 * Math.pow(0.03, brake), t, 0.12); // braking closes the filter
-  A.riser.gain.setTargetAtTime(boost * boost * 0.16, t, 0.15);
-  A.riserBp.frequency.setTargetAtTime(700 + 5500 * boost, t, 0.25);
   const turnN = clamp(input.turn / 25, -1, 1);
   if (A.pan.pan) A.pan.pan.setTargetAtTime(turnN * 0.8, t, 0.2);
   A.fb.gain.setTargetAtTime(0.28 + 0.4 * Math.abs(turnN), t, 0.2);
@@ -358,7 +662,7 @@ function control() {
   if (settings.source === 'sim') statusText = 'Simulating';
   else if (gps.denied) statusText = 'Location is off — allow it to read speed';
   else if (!gps.fixAt) statusText = 'Waiting for GPS…';
-  else if (performance.now() - gps.fixAt > 6000) statusText = 'GPS signal lost';
+  else if (now - gps.fixAt > 6000) statusText = 'GPS signal lost';
   else statusText = `GPS ±${Math.round(gps.acc)} m${motion.seen ? '' : ' · no motion sensor'}`;
 }
 
@@ -368,9 +672,11 @@ async function start() {
   if (!ctx) buildAudio();
   ctx.resume(); // must happen inside the tap
   running = true;
+  Object.assign(seq, { step: 0, bar: 0, cycle: 0, zone: 'street', launch: false, trackStart: ctx.currentTime });
+  mix.zoneWant = 'street';
   applyTrack();
-  step = 0; nextTime = ctx.currentTime + 0.1;
-  A.master.gain.setTargetAtTime(0.85, ctx.currentTime, 0.4);
+  nextTime = ctx.currentTime + 0.1;
+  A.master.gain.setTargetAtTime(0.7, ctx.currentTime, 0.4); // headroom for the louder kick and bass under acceleration
   schedTimer = setInterval(scheduler, 25);
   ctlTimer = setInterval(control, 50);
   render();
@@ -385,9 +691,11 @@ function stop() {
   A.master.gain.setTargetAtTime(0, ctx.currentTime, 0.1);
   setTimeout(() => { if (!running) ctx.suspend(); }, 500);
   stopSensors();
-  Object.assign(sim, { gas: false, brake: false, v: 0 });
-  Object.assign(input, { speed: 0, long: 0, turn: 0 });
-  mix.intensity = 0; for (const l of LAYERS) mix.level[l] = 0;
+  Object.assign(sim, { gas: false, floor: false, brake: false, v: 0 });
+  Object.assign(input, { speed: 0, long: 0, turn: 0, heading: null });
+  Object.assign(mix, { intensity: 0, boost: 0, brake: 0, surge: 0, zoneWant: 'street' });
+  for (const l of LAYERS) mix.level[l] = 0;
+  for (const d of DIRS) mix.dirW[d] = 0;
   if (wakeLock) wakeLock.release().catch(() => {});
   statusText = 'Ready';
   render();
@@ -395,9 +703,8 @@ function stop() {
 
 function applyTrack() {
   if (!ctx) return;
-  const tr = TRACKS[settings.track];
-  A.delay.delayTime.setTargetAtTime((60 / tr.bpm) * 0.75, ctx.currentTime, 0.05);
-  setPadChord(tr.prog[(step >> 4) % tr.prog.length], ctx.currentTime);
+  setTempoFx(ctx.currentTime);
+  setPadChord(currentChord(), ctx.currentTime);
 }
 
 async function setSource(src) {
@@ -410,6 +717,7 @@ async function setSource(src) {
 
 /* ---------- UI ---------- */
 const ARC = 2 * Math.PI * 120 * 0.75;
+const POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 const pills = {};
 let frameQueued = false;
 
@@ -419,10 +727,18 @@ function buildUI() {
     const el = document.createElement('span'); el.className = 'pill'; el.textContent = name;
     row.appendChild(el); pills[name] = el;
   }
+  for (const d of DIRS) {
+    const el = document.createElement('span'); el.className = 'pill'; el.textContent = `${d} · ${DIR_SOUND[d]}`;
+    $('#compass').appendChild(el); pills[d] = el;
+  }
   const sel = $('#track');
   for (const [id, t] of Object.entries(TRACKS)) sel.add(new Option(`${t.name} · ${t.bpm} bpm`, id));
   sel.value = settings.track;
-  sel.onchange = () => { settings.track = sel.value; store.set('rm.track', sel.value); applyTrack(); };
+  sel.onchange = () => {
+    settings.track = sel.value; store.set('rm.track', sel.value);
+    if (ctx) seq.trackStart = ctx.currentTime; // restart the rotation clock
+    applyTrack();
+  };
 
   for (const seg of document.querySelectorAll('.seg')) {
     const key = seg.dataset.key;
@@ -445,13 +761,13 @@ function buildUI() {
     el.addEventListener('pointerdown', on);
     for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) el.addEventListener(ev, off);
   };
-  hold($('#gas'), 'gas'); hold($('#brake'), 'brake');
+  hold($('#gas'), 'gas'); hold($('#floor'), 'floor'); hold($('#brake'), 'brake');
   const steer = $('#steer');
   steer.oninput = () => { sim.steer = +steer.value; };
   const center = () => { steer.value = 0; sim.steer = 0; };
   steer.addEventListener('pointerup', center); steer.addEventListener('pointercancel', center);
 
-  const keys = { ArrowUp: ['gas', true], ArrowDown: ['brake', true], ArrowLeft: ['steer', -1], ArrowRight: ['steer', 1] };
+  const keys = { ArrowUp: ['gas', true], f: ['floor', true], ArrowDown: ['brake', true], ArrowLeft: ['steer', -1], ArrowRight: ['steer', 1] };
   addEventListener('keydown', (e) => { const k = keys[e.key]; if (k && settings.source === 'sim') { sim[k[0]] = k[1]; e.preventDefault(); } });
   addEventListener('keyup', (e) => { const k = keys[e.key]; if (k) sim[k[0]] = k[0] === 'steer' ? 0 : false; });
 
@@ -464,8 +780,14 @@ function render() {
   const kmh = settings.units === 'kmh';
   $('#speed').textContent = Math.round(input.speed * (kmh ? 3.6 : 2.23694));
   $('#unit').textContent = kmh ? 'km/h' : 'mph';
+  if ($('#track').value !== settings.track) $('#track').value = settings.track; // follows track rotation
+  const zone = !running ? '' : input.speed < 0.4 ? 'Idle' : mix.surge > 0.5 ? 'Surge' : mix.zoneWant === 'highway' ? 'Highway' : 'Street';
+  const point = input.heading == null ? '' : POINTS[Math.round(input.heading / 45) % 8];
+  $('#zone').textContent = [zone, point].filter(Boolean).join(' · ');
+  for (const b of $('#hwy').children) b.textContent = HWY_LABEL[kmh ? 'kmh' : 'mph'][b.dataset.v];
   $('#arc').style.strokeDashoffset = ARC * (1 - mix.intensity);
   for (const name of LAYERS) pills[name].style.setProperty('--on', mix.level[name].toFixed(2));
+  for (const d of DIRS) pills[d].style.setProperty('--on', mix.dirW[d].toFixed(2));
   $('#dot').style.transform = `translate(${clamp(input.turn / 25, -1, 1) * 30}px, ${clamp(-input.long / 0.4, -1, 1) * 30}px)`;
   $('#status').textContent = statusText;
   $('#go').textContent = running ? 'Stop' : 'Start';
@@ -480,6 +802,6 @@ function render() {
 
 buildUI();
 render();
-window.revmix = { input, mix, settings, get audio() { return A; }, get ctx() { return ctx; } }; // handy for debugging
+window.revmix = { input, mix, seq, sim, settings, TRACKS, get audio() { return A; }, get ctx() { return ctx; } }; // handy for debugging
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});

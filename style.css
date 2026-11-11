@@ -32,7 +32,9 @@ h1 { margin: 0; font-size: 20px; letter-spacing: 0.04em; }
 }
 #dot { display: block; width: 12px; height: 12px; border-radius: 50%; background: var(--a); transition: transform 0.1s linear; }
 
-#layers { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+#layers, #compass { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+#compass { margin-top: -10px; }
+#compass .pill { background: color-mix(in srgb, var(--a) calc(var(--on) * 40%), var(--panel)); }
 .pill {
   --on: 0;
   padding: 5px 10px; border-radius: 999px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
@@ -50,7 +52,9 @@ button, select { font: inherit; color: inherit; }
 
 #sim { display: grid; gap: 10px; }
 #steer { width: 100%; height: 36px; accent-color: var(--a); }
-.pedals { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#zone { color: var(--a); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; min-height: 18px; margin-top: 4px; }
+.pedals { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+#floor.held { background: #6a1f63; border-color: var(--b); }
 .pedals button {
   height: 72px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel);
   font-weight: 600; touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;

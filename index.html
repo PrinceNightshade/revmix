@@ -34,11 +34,13 @@
     <div class="readout">
       <span id="speed">0</span>
       <span id="unit">mph</span>
+      <span id="zone"></span>
     </div>
     <div class="gmeter" title="Acceleration and turning"><i id="dot"></i></div>
   </section>
 
   <div id="layers" aria-label="Active layers"></div>
+  <div id="compass" aria-label="Compass sounds"></div>
 
   <button id="go" type="button">Start</button>
 
@@ -47,8 +49,9 @@
     <div class="pedals">
       <button id="brake" type="button">Brake</button>
       <button id="gas" type="button">Gas</button>
+      <button id="floor" type="button">Floor it</button>
     </div>
-    <p class="hint">Hold the pedals, drag to steer. Arrow keys work too.</p>
+    <p class="hint">Hold a pedal, drag to steer. Keys: arrows, and F to floor it.</p>
   </section>
 
   <section class="settings">
@@ -61,11 +64,18 @@
     <label>Track
       <select id="track"></select>
     </label>
-    <label>Full mix at
-      <div class="seg" data-key="range">
-        <button type="button" data-v="city">City</button>
-        <button type="button" data-v="mixed">Mixed</button>
-        <button type="button" data-v="highway">Highway</button>
+    <label>Rotate tracks
+      <div class="seg" data-key="rotate">
+        <button type="button" data-v="off">Off</button>
+        <button type="button" data-v="3">3 min</button>
+        <button type="button" data-v="5">5 min</button>
+      </div>
+    </label>
+    <label>Highway from
+      <div class="seg" id="hwy" data-key="hwy">
+        <button type="button" data-v="low">35</button>
+        <button type="button" data-v="mid">45</button>
+        <button type="button" data-v="high">55</button>
       </div>
     </label>
     <label>Units
