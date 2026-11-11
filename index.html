@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revmix</title>
+<meta name="description" content="Music that follows the car: layers build with speed, react to braking and turns.">
+<meta name="theme-color" content="#0b0d14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>Revmix</h1>
+    <p id="status" role="status">Ready</p>
+  </header>
+
+  <section class="dial" aria-label="Speed and intensity">
+    <svg viewBox="0 0 280 280" aria-hidden="true">
+      <defs>
+        <linearGradient id="grad" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#3ad6ff"/><stop offset="1" stop-color="#ff4fd8"/>
+        </linearGradient>
+      </defs>
+      <circle class="track" cx="140" cy="140" r="120"/>
+      <circle id="arc" cx="140" cy="140" r="120"/>
+    </svg>
+    <div class="readout">
+      <span id="speed">0</span>
+      <span id="unit">mph</span>
+    </div>
+    <div class="gmeter" title="Acceleration and turning"><i id="dot"></i></div>
+  </section>
+
+  <div id="layers" aria-label="Active layers"></div>
+
+  <button id="go" type="button">Start</button>
+
+  <section id="sim" hidden>
+    <input id="steer" type="range" min="-1" max="1" step="0.01" value="0" aria-label="Steering">
+    <div class="pedals">
+      <button id="brake" type="button">Brake</button>
+      <button id="gas" type="button">Gas</button>
+    </div>
+    <p class="hint">Hold the pedals, drag to steer. Arrow keys work too.</p>
+  </section>
+
+  <section class="settings">
+    <label>Input
+      <div class="seg" data-key="source">
+        <button type="button" data-v="drive">Drive</button>
+        <button type="button" data-v="sim">Simulate</button>
+      </div>
+    </label>
+    <label>Track
+      <select id="track"></select>
+    </label>
+    <label>Full mix at
+      <div class="seg" data-key="range">
+        <button type="button" data-v="city">City</button>
+        <button type="button" data-v="mixed">Mixed</button>
+        <button type="button" data-v="highway">Highway</button>
+      </div>
+    </label>
+    <label>Units
+      <div class="seg" data-key="units">
+        <button type="button" data-v="mph">mph</button>
+        <button type="button" data-v="kmh">km/h</button>
+      </div>
+    </label>
+  </section>
+
+  <p class="hint">Set it up before you pull away, then leave the phone alone. The screen stays on while it plays.</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
