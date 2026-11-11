@@ -70,3 +70,4 @@ button, select { font: inherit; color: inherit; }
 select { height: 44px; width: 100%; min-width: 0; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); padding: 0 10px; }
 .hint { margin: 0; color: var(--dim); font-size: 13px; text-align: center; }
 :focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+#update { border: 0; background: none; color: var(--a); font-size: 13px; padding: 8px; cursor: pointer; text-decoration: underline; }

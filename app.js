@@ -88,9 +88,13 @@ const RHYTHMS = ['x..x..x.x...x.x.', 'x.....x.x..x....', '..x.x..x..x...x.', 'x.
 
 // Writes a one-bar melody: picks a rhythm, then walks up and down the five-note scale in small steps
 // and lands on a restful note. The same seed always gives the same melody.
-function makePhrase(pent, seed, high) {
+function seeded(seed) {
   let x = seed >>> 0;
-  const rnd = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+  return () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296; };
+}
+
+function makePhrase(pent, seed, high) {
+  const rnd = seeded(seed);
   const ladder = [...pent, ...pent.map((n) => n + 12), 24];
   const lo = high ? 4 : 2, hi = high ? 8 : 7;
   const rhythm = RHYTHMS[Math.floor(rnd() * RHYTHMS.length)];
@@ -110,7 +114,7 @@ function makePhrase(pent, seed, high) {
 for (const [id, tr] of Object.entries(TRACKS)) {
   const chords = (seqs) => Object.fromEntries(DIRS.map((d) => [d, seqs[d].split(' ').map((tok) => chord(SCALES[tr.scale], tok))]));
   tr.prog = { street: chords(tr.dirs), highway: chords(tr.hwDirs) };
-  const seed = [...id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7);
+  const seed = tr.seed = [...id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7);
   const pent = PENT[tr.scale];
   tr.leads = {
     street: [tr.lead, ...[1, 2, 3].map((n) => makePhrase(pent, seed + n * 977, false))],
@@ -119,6 +123,59 @@ for (const [id, tr] of Object.entries(TRACKS)) {
   tr.arps = [tr.arp, [...tr.arp].reverse(), [0, 1, 2, 3, 2, 1, 0, 1, 2, 3, 2, 1, 0, 2, 1, 3]];
 }
 const ROTATE = { off: 0, 3: 3, 5: 5 }; // minutes before moving to the next track
+
+/* ---------- Chapters ---------- */
+// A drive is told in chapters of 64 bars. Each chapter ends with a breakdown and a build, and the next one
+// opens in a new key with new chord sequences, new melodies and different instrument tones.
+// Chapter 1 is the track as written; later chapters are composed by rule from these building blocks.
+const CELLS = { // four-chord movements that work in each kind of key
+  minor: ['1 6 3 7', '1 7 6 7', '6 7 1 1', '1 4 6 5', '4 6 1 7', '6 3 7 1', '1 3 7 4', '3 7 1 6', '4 5 6 7', '1 6 4 5', '6 4 1 5', '1 5 6 4', '4 1 6 7', '3 4 6 7', '1 7 4 6', '6 1 3 7'],
+  major: ['1 6 2 5', '4 5 3 6', '6 4 1 5', '2 5 1 6', '1 3 4 5', '4 3 2 5', '1 5 6 4', '6 5 4 5', '2 3 4 5', '1 4 6 5', '4 1 5 6', '3 6 2 5'],
+};
+const TURNS = { minor: ['5', '7', '7o', '3', '3n'], major: ['5', '5', '4', '2', '1n'] }; // chords that lead back to the start
+const BASS_POOL = ['x.x.x.x.x.x.x.xx', 'x..x..x.x..x..x.', 'x.xxx.xxx.xxx.xx', 'x...x.x.x...x.xx', 'x.x...x.x.x...x.'];
+const WAVES = ['sawtooth', 'square', 'triangle'];
+const KEY_MOVES = [5, -2, 3, -4, 7, -5, 2]; // semitones to the next chapter's key
+
+function makeChapter(id, n) {
+  const tr = TRACKS[id];
+  if (n === 0) return { n, shift: 0, prog: tr.prog, leads: tr.leads, arps: tr.arps, leadWave: 'sawtooth', arpWave: tr.arpWave, bass: tr.street.bass };
+  const rnd = seeded(tr.seed + n * 7919);
+  const pick = (list) => list[Math.floor(rnd() * list.length)];
+
+  // Key: walk from the home key one move per chapter, staying within half an octave of home.
+  let shift = 0;
+  const walk = seeded(tr.seed + 31);
+  const recent = [0];
+  for (let k = 0; k < n; k++) {
+    const wrap = (v) => (v > 6 ? v - 12 : v < -5 ? v + 12 : v);
+    const options = KEY_MOVES.map((m) => wrap(shift + m)).filter((v) => !recent.includes(v)); // don't return to a recent key
+    shift = options[Math.floor(walk() * options.length)];
+    recent.push(shift);
+    if (recent.length > 4) recent.shift();
+  }
+
+  // Chords: shuffle the movements, give each direction and zone its own, and end each 8 bars on a turnaround.
+  const cells = [...CELLS[tr.scale]];
+  for (let k = cells.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [cells[k], cells[j]] = [cells[j], cells[k]]; }
+  const seqOf = (k) => {
+    const a = cells[k % cells.length].split(' ');
+    const b = rnd() < 0.5 ? [...a] : cells[(k + 8) % cells.length].split(' ');
+    b[3] = pick(TURNS[tr.scale]);
+    if (rnd() < 0.4) a[2] += 'n';
+    return [...a, ...b].map((tok) => chord(SCALES[tr.scale], tok));
+  };
+  const prog = { street: {}, highway: {} };
+  DIRS.forEach((d, k) => { prog.street[d] = seqOf(k); prog.highway[d] = seqOf(k + 4); });
+
+  const pent = PENT[tr.scale];
+  const leads = {
+    street: [1, 2, 3, 4].map((m) => makePhrase(pent, tr.seed + n * 104729 + m * 977, false)),
+    highway: [1, 2, 3, 4].map((m) => makePhrase(pent, tr.seed + n * 104729 + 5000 + m * 613, true)),
+  };
+  const arps = tr.arps.map((_, k) => tr.arps[(k + n) % tr.arps.length]);
+  return { n, shift, prog, leads, arps, leadWave: pick(WAVES), arpWave: pick(WAVES), bass: pick(BASS_POOL) };
+}
 // Each compass direction has a signature sound. Their volumes follow the heading, so NE is half N, half E.
 const DIR_SOUND = { N: 'glass', E: 'pluck', S: 'drone', W: 'strings' };
 const DIR_VOL = { N: 0.2, E: 0.2, S: 0.26, W: 0.11 };
@@ -160,7 +217,9 @@ let statusText = 'Ready';
 let ctx, A; // A = audio nodes
 // Sequencer position: step 0-15 in the bar, bar 0-7 in the chord sequence, cycle = sequences played.
 // zone and dir only change on a bar line, so switches land in time.
-const seq = { step: 0, bar: 0, cycle: 0, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0 };
+// bpm is fixed for the whole drive: it is set by the track you choose and kept when tracks rotate.
+const seq = { step: 0, bar: 0, cycle: 0, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
+let chap = makeChapter(settings.track, 0); // the chapter being played
 let nextTime = 0, schedTimer = null, ctlTimer = null;
 
 function buildAudio() {
@@ -214,7 +273,8 @@ function buildAudio() {
   // S: a low drone. W: a wide wash of detuned strings. The drone and strings run all the time and are retuned per chord.
   const dirGain = {};
   for (const d of DIRS) { const g = ctx.createGain(); g.gain.value = 0; g.connect(lp); dirGain[d] = g; }
-  dirGain.N.connect(delay);
+  const bellSend = ctx.createGain(); bellSend.gain.value = 0.35; // only a little echo, so bells don't ring into the next chord
+  dirGain.N.connect(bellSend); bellSend.connect(delay);
   const eDelay = ctx.createDelay(1), eFb = ctx.createGain(); eFb.gain.value = 0.5;
   dirGain.E.connect(eDelay); eDelay.connect(eFb); eFb.connect(eDelay); eDelay.connect(lp);
 
@@ -243,22 +303,22 @@ function buildAudio() {
   A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, dirGain, eDelay, drone, strings };
 }
 
-const currentChord = () => TRACKS[settings.track].prog[seq.zone][seq.dir][seq.bar];
+const currentChord = () => chap.prog[seq.zone][seq.dir][seq.bar];
 
 function setPadChord(chord, t) {
-  const tr = TRACKS[settings.track];
+  const root = TRACKS[settings.track].root + chap.shift;
   for (const { o, v } of A.padOsc) {
     // Every other pass through the sequence, the lowest voice moves up an octave for a different colour.
     const lift = (seq.cycle & 1) && v === 0 ? 12 : 0;
-    o.frequency.setTargetAtTime(mtof(tr.root + 12 + chord.r + chord.iv[v] + lift), t, 0.06);
+    o.frequency.setTargetAtTime(mtof(root + 12 + chord.r + chord.iv[v] + lift), t, 0.06);
   }
-  for (const { o, semis } of A.drone) o.frequency.setTargetAtTime(mtof(tr.root + chord.r + semis), t, 0.12);
-  for (const { o, v } of A.strings) o.frequency.setTargetAtTime(mtof(tr.root + 24 + chord.r + chord.iv[v]), t, 0.1);
+  for (const { o, semis } of A.drone) o.frequency.setTargetAtTime(mtof(root + chord.r + semis), t, 0.12);
+  for (const { o, v } of A.strings) o.frequency.setTargetAtTime(mtof(root + 24 + chord.r + chord.iv[v]), t, 0.1);
 }
 
-// North's bell: a pure tone with a fainter, higher ring on top.
+// North's bell: a pure tone with fainter rings an octave and a twelfth above, so it stays in tune with the band.
 function bell(t, midi, vol) {
-  for (const [mult, v, dur] of [[1, vol, 1.4], [2.76, vol * 0.35, 0.7]]) {
+  for (const [mult, v, dur] of [[1, vol, 1.0], [2, vol * 0.3, 0.5], [3, vol * 0.1, 0.3]]) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.value = mtof(midi) * mult;
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.005);
@@ -268,7 +328,7 @@ function bell(t, midi, vol) {
 }
 
 function setTempoFx(t) {
-  const beat = 60 / TRACKS[settings.track].bpm;
+  const beat = 60 / seq.bpm;
   A.delay.delayTime.setTargetAtTime(beat * 0.75, t, 0.05);
   A.eDelay.delayTime.setTargetAtTime(beat * 0.5, t, 0.05);
 }
@@ -324,14 +384,6 @@ function crash(t, vol = 1) {
   o.connect(g); g.connect(A.fx); o.start(t); o.stop(t + 1);
 }
 
-function nextTrack(t) {
-  const ids = Object.keys(TRACKS);
-  settings.track = ids[(ids.indexOf(settings.track) + 1) % ids.length]; // not saved: the chosen track is still the starting point
-  seq.trackStart = t; seq.cycle = 0;
-  setTempoFx(t);
-  crash(t, 0.6);
-}
-
 function scheduleStep(t) {
   let tr = TRACKS[settings.track];
   const i = seq.step;
@@ -342,33 +394,43 @@ function scheduleStep(t) {
     if (zoned || seq.dir !== mix.dirWant) {
       seq.dir = mix.dirWant; seq.zone = mix.zoneWant;
       if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
-      if (seq.cycle % 8 === 6) seq.cycle++; // never open a new section with a breakdown
+      if (seq.cycle % 8 === 7) seq.cycle++; // never open a new section with a breakdown
       if (zoned && seq.zone === 'highway') crash(t);
     }
-    if (seq.bar === 0) {
+    const n = Math.floor(seq.cycle / 8);
+    if (seq.bar === 0 && n !== chap.n) {
+      // A new chapter. This is also the only place a track may rotate, and the tempo carries over.
       const mins = ROTATE[settings.rotate];
-      if (mins && t - seq.trackStart > mins * 60) { nextTrack(t); tr = TRACKS[settings.track]; }
-      else if (seq.cycle % 8 === 7 && mix.level.snare > 0.5) crash(t, 0.6); // the band returns after a breakdown
+      if (mins && t - seq.trackStart > mins * 60) {
+        const ids = Object.keys(TRACKS);
+        settings.track = ids[(ids.indexOf(settings.track) + 1) % ids.length]; // not saved: the chosen track is still the starting point
+        seq.trackStart = t;
+        tr = TRACKS[settings.track];
+      }
+      chap = makeChapter(settings.track, n);
+      if (mix.level.kick > 0.5) crash(t, 0.7);
     }
     setPadChord(currentChord(), t);
   }
   if (seq.launch) { seq.launch = false; crash(t); }
 
   const chord = currentChord();
+  const root = tr.root + chap.shift;
   const L = mix.level, I = mix.intensity, surge = mix.surge;
-  const s16 = 60 / tr.bpm / 4;
+  const s16 = 60 / seq.bpm / 4;
   const highway = seq.zone === 'highway';
   const driving = highway || surge > 0.5; // the busier groove
   const g = driving ? tr.hw : tr.street;
+  const bassPattern = driving ? tr.hw.bass : chap.bass;
   const bright = 1 + 0.3 * mix.bright;
 
-  // The long-form shape: every 8 passes through the chords (64 bars) the music goes
-  // melody A, melody B, no melody, melody C, ... then a breakdown and a build back in.
+  // The shape of a chapter, in 8-bar passes: melody A, melody B, no melody, C, D, A, B,
+  // then a breakdown and a build that lead into the next chapter.
   const form = seq.cycle % 8;
   const calm = surge < 0.3; // never interrupt hard acceleration
-  const breakdown = form === 6 && seq.bar < 4 && calm;  // drums and bass drop out for four bars
-  const build = form === 6 && seq.bar === 7 && calm;    // a snare build brings them back
-  const fill = seq.bar === 7 && i >= 12 && surge <= 0.5 && !build && L.snare > 0.01; // drum fill ending each sequence
+  const breakdown = form === 7 && seq.bar < 4 && calm;  // drums and bass drop out for four bars
+  const build = form === 7 && seq.bar === 7 && calm;    // a snare build brings them back
+  const fill = seq.bar === 7 && i >= 12 && surge <= 0.5 && !build && L.snare > 0.01; // drum fill ending each pass
   const fillKind = seq.cycle % 3;
 
   if (L.kick > 0.01 && !breakdown) {
@@ -390,39 +452,41 @@ function scheduleStep(t) {
     if (h === 'o') noiseHit(t, A.layer.hats, 'highpass', 7500, 0.1, 0.8);
     else if (h === 'x' && !breakdown) noiseHit(t, A.layer.hats, 'highpass', 7500, 0.04, 0.8);
   }
-  if (L.bass > 0.01 && g.bass[i] === 'x' && !breakdown) {
+  if (L.bass > 0.01 && bassPattern[i] === 'x' && !breakdown) {
     // Driving groove: steady eighth notes, low on the beat and an octave up in between, with a brighter bite.
     const bounce = driving && i % 4 === 2 ? 12 : 0;
-    pluck(t, A.layer.bass, tr.root - 12 + chord.r + bounce, tr.bassWave, s16 * 1.7, driving ? 1 : 0.9, (500 + I * 1800) * (driving ? 1.6 : 1));
+    pluck(t, A.layer.bass, root - 12 + chord.r + bounce, tr.bassWave, s16 * 1.7, driving ? 1 : 0.9, (500 + I * 1800) * (driving ? 1.6 : 1));
     // Under acceleration a second, hollower voice doubles the bass to thicken it.
-    if (surge > 0.3) pluck(t, A.layer.bass, tr.root - 12 + chord.r + bounce, 'square', s16 * 1.7, 0.45 * surge, 900 + 1400 * surge);
+    if (surge > 0.3) pluck(t, A.layer.bass, root - 12 + chord.r + bounce, 'square', s16 * 1.7, 0.45 * surge, 900 + 1400 * surge);
   }
   // Arp pattern changes every pass, and again halfway through.
-  const ai = tr.arps[(seq.cycle + (seq.bar >= 4 ? 1 : 0)) % tr.arps.length][i];
+  const ai = chap.arps[(seq.cycle + (seq.bar >= 4 ? 1 : 0)) % chap.arps.length][i];
   if (L.arp > 0.01 && ai != null) {
-    pluck(t, A.layer.arp, tr.root + 24 + chord.r + chord.iv[ai], tr.arpWave, s16 * 1.4, 0.7, (1200 + I * 3000) * bright);
+    pluck(t, A.layer.arp, root + 24 + chord.r + chord.iv[ai], chap.arpWave, s16 * 1.4, 0.7, (1200 + I * 3000) * bright);
   }
   // Lead: the highway has its own melodies, trading two phrases bar by bar with a thicker sound.
   // The street plays one phrase every other bar, then answers with the next phrase in the second half.
-  const leads = tr.leads[seq.zone];
+  const leads = chap.leads[seq.zone];
   const ln = leads[(seq.cycle + (highway ? seq.bar & 1 : seq.bar >= 4 ? 1 : 0)) % leads.length][i];
   if (L.lead > 0.01 && ln != null && form !== 2 && (driving || (seq.bar & 1) === 0)) {
-    pluck(t, A.layer.lead, tr.root + 24 + ln, 'sawtooth', s16 * 3.5, 0.7, 2600 * bright);
-    if (highway) pluck(t, A.layer.lead, tr.root + 24 + ln, 'sawtooth', s16 * 3.5, 0.45, 2600 * bright, 14);
+    pluck(t, A.layer.lead, root + 24 + ln, chap.leadWave, s16 * 3.5, 0.7, 2600 * bright);
+    if (highway) pluck(t, A.layer.lead, root + 24 + ln, 'sawtooth', s16 * 3.5, 0.45, 2600 * bright, 14);
   }
   if (L.stabs > 0.01 && STAB[i] === 'x' && !breakdown) {
     for (let v = 0; v < 3; v++) {
-      pluck(t, A.layer.stabs, tr.root + 24 + chord.r + chord.iv[v], 'sawtooth', s16 * 1.8, 0.45, 3500 * bright);
+      pluck(t, A.layer.stabs, root + 24 + chord.r + chord.iv[v], 'sawtooth', s16 * 1.8, 0.45, 3500 * bright);
     }
   }
 
   // Compass sounds that are played as notes (the drone and strings sound continuously).
-  if (mix.dirW.N > 0.03) {
-    const k = [0, 6, 11].indexOf(i);
-    if (k >= 0) bell(t, tr.root + 36 + chord.r + chord.iv[[3, 1, 2][k]], 0.5);
+  if (mix.dirW.N > 0.03 && (i === 0 || i === 6 || i === 10)) {
+    // Bells only use notes of the chord that also belong to the melody's five-note scale, so they never clash with it.
+    const safe = chord.iv.slice(0, 3).map((v) => chord.r + v).filter((nn) => PENT[tr.scale].includes(((nn % 12) + 12) % 12));
+    const pool = safe.length ? safe : [0, 7];
+    bell(t, root + 36 + pool[(i + seq.bar) % pool.length], 0.5);
   }
   if (mix.dirW.E > 0.03 && E_PLUCK[i] === 'x') {
-    pluck(t, A.dirGain.E, tr.root + 24 + chord.r + chord.iv[[0, 2, 1, 3][(i + seq.bar) % 4]], 'triangle', s16 * 0.9, 0.8, 3200);
+    pluck(t, A.dirGain.E, root + 24 + chord.r + chord.iv[[0, 2, 1, 3][(i + seq.bar) % 4]], 'triangle', s16 * 0.9, 0.8, 3200);
   }
 
   seq.step = (i + 1) % 16;
@@ -435,10 +499,11 @@ function scheduleStep(t) {
 function scheduler() {
   const tr = TRACKS[settings.track];
   if (nextTime < ctx.currentTime) nextTime = ctx.currentTime + 0.05; // recover after a stall
-  while (nextTime < ctx.currentTime + 0.15) {
+  // Notes are booked a quarter of a second ahead, so a busy phone can't make the beat stumble.
+  while (nextTime < ctx.currentTime + 0.25) {
     const even = seq.step % 2 === 0;
     scheduleStep(nextTime);
-    nextTime += (60 / tr.bpm / 4) * (even ? 1 + tr.swing : 1 - tr.swing);
+    nextTime += (60 / seq.bpm / 4) * (even ? 1 + tr.swing : 1 - tr.swing);
   }
 }
 
@@ -672,7 +737,8 @@ async function start() {
   if (!ctx) buildAudio();
   ctx.resume(); // must happen inside the tap
   running = true;
-  Object.assign(seq, { step: 0, bar: 0, cycle: 0, zone: 'street', launch: false, trackStart: ctx.currentTime });
+  Object.assign(seq, { step: 0, bar: 0, cycle: 0, zone: 'street', launch: false, trackStart: ctx.currentTime, bpm: TRACKS[settings.track].bpm });
+  chap = makeChapter(settings.track, 0);
   mix.zoneWant = 'street';
   applyTrack();
   nextTime = ctx.currentTime + 0.1;
@@ -699,6 +765,7 @@ function stop() {
   if (wakeLock) wakeLock.release().catch(() => {});
   statusText = 'Ready';
   render();
+  if (updateReady) location.reload();
 }
 
 function applyTrack() {
@@ -736,6 +803,9 @@ function buildUI() {
   sel.value = settings.track;
   sel.onchange = () => {
     settings.track = sel.value; store.set('rm.track', sel.value);
+    // Choosing a track starts its story from chapter 1, at its own tempo.
+    seq.cycle = 0; seq.bar = 0; seq.step = 0; seq.bpm = TRACKS[sel.value].bpm;
+    chap = makeChapter(sel.value, 0);
     if (ctx) seq.trackStart = ctx.currentTime; // restart the rotation clock
     applyTrack();
   };
@@ -783,7 +853,7 @@ function render() {
   if ($('#track').value !== settings.track) $('#track').value = settings.track; // follows track rotation
   const zone = !running ? '' : input.speed < 0.4 ? 'Idle' : mix.surge > 0.5 ? 'Surge' : mix.zoneWant === 'highway' ? 'Highway' : 'Street';
   const point = input.heading == null ? '' : POINTS[Math.round(input.heading / 45) % 8];
-  $('#zone').textContent = [zone, point].filter(Boolean).join(' · ');
+  $('#zone').textContent = [zone, point, running ? 'Ch ' + (chap.n + 1) : ''].filter(Boolean).join(' · ');
   for (const b of $('#hwy').children) b.textContent = HWY_LABEL[kmh ? 'kmh' : 'mph'][b.dataset.v];
   $('#arc').style.strokeDashoffset = ARC * (1 - mix.intensity);
   for (const name of LAYERS) pills[name].style.setProperty('--on', mix.level[name].toFixed(2));
@@ -802,6 +872,47 @@ function render() {
 
 buildUI();
 render();
-window.revmix = { input, mix, seq, sim, settings, TRACKS, get audio() { return A; }, get ctx() { return ctx; } }; // handy for debugging
+window.revmix = { input, mix, seq, sim, settings, TRACKS, makeChapter, get chap() { return chap; }, get audio() { return A; }, get ctx() { return ctx; } }; // handy for debugging
+
+/* ---------- Updates ---------- */
+// An installed app is rarely reloaded by the phone, so it checks for a new version itself:
+// on launch, whenever it comes back to the foreground, and from the "Check for updates" link.
+// The version code is a fingerprint of the app's own files, so nothing needs bumping by hand.
+let loadedPrint = null, updateReady = false;
+
+async function fingerprint() {
+  const parts = await Promise.all(['./', 'app.js', 'style.css'].map((f) => fetch(f, { cache: 'no-store' }).then((r) => {
+    if (!r.ok) throw new Error(r.status);
+    return r.text();
+  })));
+  let h = 5381;
+  const all = parts.join('\n');
+  for (let i = 0; i < all.length; i++) h = ((h * 33) ^ all.charCodeAt(i)) >>> 0;
+  return h.toString(16).padStart(8, '0').slice(0, 6);
+}
+
+async function checkUpdate(manual) {
+  const link = $('#update');
+  try {
+    if (manual) link.textContent = 'Checking…';
+    const now = await fingerprint();
+    if (loadedPrint == null) loadedPrint = now;
+    $('#version').textContent = 'Version ' + loadedPrint;
+    if (now !== loadedPrint) {
+      if (!running) { location.reload(); return; }
+      updateReady = true; // don't interrupt the music; reload when it stops
+      link.textContent = 'Update ready — tap to reload';
+    } else if (manual) {
+      link.textContent = 'Up to date';
+      setTimeout(() => { if (!updateReady) link.textContent = 'Check for updates'; }, 2500);
+    }
+  } catch {
+    if (manual) { link.textContent = 'Could not check — offline?'; setTimeout(() => { link.textContent = 'Check for updates'; }, 2500); }
+  }
+}
+
+$('#update').onclick = () => (updateReady ? location.reload() : checkUpdate(true));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
+checkUpdate(false);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
