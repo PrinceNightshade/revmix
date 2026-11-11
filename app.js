@@ -14,7 +14,9 @@ const store = {
 /* ---------- Harmony ---------- */
 const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
 // A chord is written as a scale degree (1-7). It gets a seventh on top by default;
-// "n" puts a ninth on top and "o" an octave. Result: r = semitones from the key note, iv = chord tones.
+// "n" puts a ninth on top and "o" an octave. Result: r = semitones from the key note, and the chord tones
+// in three flavours: rich (as written), simple (plain three-note chord, doubled at the octave) and
+// open (no middle note at all: root, fifth, octave, fifth).
 function chord(scale, tok) {
   const d = parseInt(tok, 10) - 1;
   const top = tok.endsWith('n') ? 8 : tok.endsWith('o') ? 7 : 6;
@@ -22,7 +24,7 @@ function chord(scale, tok) {
   let r = note(d);
   const iv = [0, 2, 4, top].map((k) => note(d + k) - r);
   if (r > 5) r -= 12; // keep roots near the key note so the bass stays in register
-  return { r, iv };
+  return { rich: { r, iv }, simple: { r, iv: [iv[0], iv[1], iv[2], 12] }, open: { r, iv: [0, iv[2], 12, iv[2] + 12] } };
 }
 
 /* ---------- Tracks ---------- */
@@ -206,7 +208,9 @@ const settings = {
   units: store.get('rm.units', 'mph'),
   source: store.get('rm.source', 'drive'),
   rotate: store.get('rm.rotate', '5'),
+  chords: store.get('rm.chords', 'simple'),
 };
+if (!['rich', 'simple', 'open'].includes(settings.chords)) settings.chords = 'simple';
 if (!TRACKS[settings.track]) settings.track = 'night';
 if (!HWY[settings.hwy]) settings.hwy = 'mid';
 if (!(settings.rotate in ROTATE)) settings.rotate = '5';
@@ -225,10 +229,11 @@ let statusText = 'Ready';
 
 /* ---------- Audio ---------- */
 let ctx, A; // A = audio nodes
-// Sequencer position: step 0-15 in the bar, bar 0-7 in the chord sequence, cycle = sequences played.
+// Sequencer position: step 0-15 in the bar, bar 0-7 in the 8-bar pass, cycle = passes played.
+// ci = which of the 8 chords is sounding; held and dist = bars and metres travelled since it arrived.
 // zone and dir only change on a bar line, so switches land in time.
 // bpm is fixed for the whole drive: it is set by the track you choose and kept when tracks rotate.
-const seq = { step: 0, bar: 0, cycle: 0, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
+const seq = { step: 0, bar: 0, cycle: 0, ci: 0, held: 0, dist: 0, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
 let chap = makeChapter(settings.track, 0); // the chapter being played
 let nextTime = 0, schedTimer = null, ctlTimer = null;
 
@@ -313,7 +318,11 @@ function buildAudio() {
   A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, dirGain, eDelay, drone, strings };
 }
 
-const currentChord = () => chap.prog[seq.zone][seq.dir][seq.bar];
+// The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
+// bar line. So the beat never changes, but the harmony moves slowly in town and faster on the highway.
+const CHORD_M = 70;
+const currentChord = () => chap.prog[seq.zone][seq.dir][seq.ci][settings.chords];
+const firstChord = () => { seq.ci = 0; seq.held = 0; seq.dist = 0; };
 
 function setPadChord(chord, t) {
   const root = TRACKS[settings.track].root + chap.shift;
@@ -409,6 +418,7 @@ function scheduleStep(t) {
       seq.dir = mix.dirWant; seq.zone = mix.zoneWant;
       if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
       if (seq.cycle % 8 === 7) seq.cycle++; // never open a new section with a breakdown
+      firstChord();
       if (zoned && seq.zone === 'highway') crash(t);
     }
     const n = Math.floor(seq.cycle / 8);
@@ -422,6 +432,7 @@ function scheduleStep(t) {
         tr = TRACKS[settings.track];
       }
       chap = makeChapter(settings.track, n);
+      firstChord();
       if (mix.level.kick > 0.5) crash(t, 0.7);
     }
     setPadChord(currentChord(), t);
@@ -508,6 +519,11 @@ function scheduleStep(t) {
   if (seq.step === 0 && input.speed >= 0.4) {
     seq.bar = (seq.bar + 1) % 8;
     if (seq.bar === 0) seq.cycle++;
+    // Next chord once the car has covered the distance: after 2, 4 or 6 bars, and never later than 8.
+    seq.held++; seq.dist += input.speed * s16 * 16;
+    if (seq.held >= 8 || (seq.held % 2 === 0 && seq.dist >= CHORD_M)) {
+      seq.ci = (seq.ci + 1) % 8; seq.held = 0; seq.dist = 0;
+    }
   }
 }
 
@@ -806,6 +822,7 @@ function chooseTrack(id) {
   settings.track = id; store.set('rm.track', id);
   // Choosing a track starts its story from chapter 1, at its own tempo.
   seq.cycle = 0; seq.bar = 0; seq.step = 0; seq.bpm = TRACKS[id].bpm;
+  firstChord();
   chap = makeChapter(id, 0);
   if (ctx) seq.trackStart = ctx.currentTime; // restart the rotation clock
   applyTrack();
