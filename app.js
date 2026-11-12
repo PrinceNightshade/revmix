@@ -86,7 +86,7 @@ const TRACKS = {
   cathedral: { // a choir singing Pachelbel's Canon in D: one eight-chord loop, with the tune and its variations on top
     name: 'Cathedral', bpm: 88, swing: 0, root: 50, scale: 'major', canon: true,
     vibe: 'Pachelbel\u2019s Canon, sung',
-    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', strings: { street: 0.3, hw: 0.55 } }, // the choir leads
+    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', choir: { street: 0.65, hw: 0.7 }, strings: { street: 0.6, hw: 0.85 } }, // choir and strings share the lead
     dirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     hwDirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     street: { kick: 'x.......x.....x.', snare: '........x.......', hat: '....x.......x...', bass: 'x.......x.......' },
@@ -210,6 +210,7 @@ const DIR_VOL = { N: 0.2, E: 0.2, S: 0.26, W: 0.11 };
 const E_PLUCK = 'x..x..x..x.x..x.';
 const STAB = '...x..x...x..x..';
 
+const HARD_G = 0.3; // forward acceleration, in g, that counts as flooring it
 const LAYERS = ['pad', 'bass', 'kick', 'hats', 'snare', 'arp', 'lead', 'stabs'];
 // Speed in mph at which each layer joins. Everything is in by 25 mph.
 const JOIN = { pad: -99, bass: 3, kick: 7, hats: 11, snare: 15, arp: 19, lead: 23 };
@@ -233,7 +234,7 @@ if (!(settings.rotate in ROTATE)) settings.rotate = '5';
 
 // What the music listens to. speed in m/s, long in g (+ = accelerating), turn in deg/s (+ = right),
 // heading in degrees clockwise from north (null until known).
-const input = { speed: 0, long: 0, turn: 0, heading: null };
+const input = { speed: 0, long: 0, turn: 0, heading: null, push: 0 }; // push = forward force felt right now, in g
 const mix = {
   intensity: 0, boost: 0, brake: 0, surge: 0, bright: 0,
   zoneWant: 'street', dirWant: 'N',
@@ -652,11 +653,11 @@ function scheduleStep(t) {
     }
     setPadChord(currentChord(), t);
   }
-  // Flooring it earns a crash only on the first beat of a bar, and only if the car is still pulling hard
-  // when that beat arrives. A short stab at the pedal between beats gets none, which keeps crashes musical.
-  if (i === 0 && seq.launch) {
+  // Flooring it earns a crash only on the first or third beat of a bar, and only if the car is still being
+  // pushed hard at that moment. Lifting off before the beat gets none, which keeps crashes rare and musical.
+  if (i % 8 === 0 && seq.launch) {
     seq.launch = false;
-    if (mix.surge > 0.5) { crash(t); seq.lastLaunch = performance.now(); }
+    if (input.long > HARD_G * 0.85 && input.push > HARD_G * 0.6) { crash(t); seq.lastLaunch = performance.now(); }
   }
 
   const chord = currentChord();
@@ -682,7 +683,7 @@ function scheduleStep(t) {
     const swell = breakdown && L.kick > 0.3 ? 0.7 : 0;
     const low = root + 12 + chord.r, mid = low + 12;
     sustain('choir', 'choir', A.choirSung, t, chord.iv.map((v) => low + v),
-      (tr.kit.pad === 'choir' ? 1 : Math.max((highway ? ck.hw : ck.street) || 0, swell)) * CHOIR_VOL, 2);
+      Math.max((highway ? ck.hw : ck.street) || 0, swell) * CHOIR_VOL, 2);
     sustain('strings', 'strings', A.choirSung, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
       ((highway ? sk.hw : sk.street) || 0) * STRINGS_VOL, 1);
     sustain('west', 'strings', A.dirGain.W, t, chord.iv.slice(0, 3).map((v) => mid + v), mix.dirW.W > 0.03 ? WEST_VOL : 0, 1);
@@ -724,12 +725,12 @@ function scheduleStep(t) {
     // nothing, the strings in harmony, the running figure, then the figure twice as fast.
     const base = root + 24, ci = seq.ci, moving = input.speed >= 0.4;
     if (i === 0 && seq.held % 2 === 0 && moving) {
-      if (L.arp > 0.01) pluck(t, A.layer.arp, base + CANON.a[ci], 'voice', s16 * 17, 1, 0);
-      if (L.lead > 0.01 && (form === 1 || form === 4)) pluck(t, A.layer.lead, base + CANON.b[ci], 'strings', s16 * 17, 0.8, 0);
+      if (L.arp > 0.01) pluck(t, A.layer.arp, base + CANON.a[ci], 'voice', s16 * 17, 0.75, 0);
+      if (L.lead > 0.01 && (form === 1 || form === 4)) pluck(t, A.layer.lead, base + CANON.b[ci], 'strings', s16 * 17, 1.1, 0);
     }
     const fast = form === 3 || form === 6, every = fast ? 2 : 4;
     if (L.lead > 0.01 && (fast || form === 2 || form === 5) && i % every === 0) {
-      pluck(t, A.layer.lead, base + CANON.fig[ci][(i / every) % 4], chap.leadWave, s16 * (fast ? 2.4 : 4.5), 0.6, 2600 * bright);
+      pluck(t, A.layer.lead, base + CANON.fig[ci][(i / every) % 4], chap.leadWave, s16 * (fast ? 2.4 : 4.5), 0.85, 2600 * bright);
     }
   } else {
     // Arp pattern changes every pass, and again halfway through.
@@ -869,6 +870,7 @@ function onMotion(e) {
     motion.seen = true;
   }
   if (hasLin) {
+    motion.lin = true;
     const dot = a.x * ux + a.y * uy + a.z * uz;
     const h = Math.hypot(a.x - dot * ux, a.y - dot * uy, a.z - dot * uz) / 9.81;
     motion.horiz += (h - motion.horiz) * 0.04;
@@ -895,7 +897,7 @@ function stopSensors() {
   if (geoId != null) navigator.geolocation.clearWatch(geoId);
   geoId = null;
   Object.assign(gps, { target: 0, long: 0, lastV: null, lastPos: null, anchor: null, heading: null, fixAt: 0, acc: null });
-  Object.assign(motion, { turn: 0, horiz: 0, seen: false, grav: null });
+  Object.assign(motion, { turn: 0, horiz: 0, seen: false, grav: null, lin: false });
 }
 
 async function holdWake() {
@@ -917,6 +919,7 @@ function simStep(dt) {
   const real = (sim.v - before) / dt / 9.81;
   input.speed = sim.v;
   input.long += (real - input.long) * 0.3;
+  input.push = Math.max(0, real);
   input.turn = sim.v > 1 ? sim.steer * 28 : 0;
   sim.heading = (sim.heading + input.turn * dt + 360) % 360;
   input.heading = sim.heading;
@@ -933,6 +936,8 @@ function driveStep(dt) {
   if (Math.abs(long) > 0.03) long = Math.sign(long) * Math.max(Math.abs(long), Math.min(fwd, 0.6));
   if (performance.now() - gps.fixAt > 4000) long = 0;
   input.long += (long - input.long) * Math.min(1, dt * 4);
+  // GPS speed arrives a second or two late. The motion sensor is immediate, so it is what says the push is over.
+  input.push = motion.lin ? fwd : Math.max(0, long);
   input.turn = turn;
   input.heading = gps.heading;
 }
@@ -956,7 +961,10 @@ function control() {
   const surgeTarget = moving ? clamp((input.long - 0.1) / 0.15) : 0;
   const was = mix.surge;
   mix.surge += (surgeTarget - mix.surge) * (surgeTarget > mix.surge ? 0.3 : 0.03);
-  if (was < 0.6 && mix.surge >= 0.6 && now - seq.lastLaunch > 8000) seq.launch = true;
+  // The driving groove above answers ordinary brisk acceleration. A crash is kept for a properly hard push.
+  const hard = moving && input.long >= HARD_G;
+  if (hard && !mix.hard && now - seq.lastLaunch > 8000) seq.launch = true;
+  mix.hard = hard;
   const surge = mix.surge;
 
   // Zone: street or highway, with a gap between the two thresholds so it doesn't flicker.
