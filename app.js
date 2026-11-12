@@ -33,23 +33,23 @@ function chord(scale, tok) {
 // arp = which chord tone to play; lead = semitones above the key note (null = rest).
 // More melodies and arp patterns are derived from these below, so each track has several to rotate through.
 // kit: the track's own drum sounds, pad tone, instrument tones and amount of echo.
+// Besides the plain synth tones there are recorded instruments: 'choir' (pad), 'voice', 'mallet', 'piano', 'harp', 'celeste' and 'strings'.
+// choir / strings: how much of the recorded choir and string section plays along with the pad on the street
+// and on the highway. hwLead: the instrument that doubles the melody on the highway.
+// Pachelbel's Canon, written as semitones above the key note, one entry per chord of its eight-chord loop.
+// a = the famous slow descending tune, b = the second voice that joins under it, fig = the running figure.
+const CANON = {
+  chords: '1 5 6 3 4 1 4 5',
+  a: [4, 2, 0, -1, -3, -5, -3, -1],
+  b: [0, -1, -3, -5, -7, -8, -7, -10],
+  fig: [[0, 4, 7, 5], [4, 0, 4, 2], [0, -3, 0, 7], [5, 9, 7, 5], [4, 0, 2, 11], [12, 16, 19, 7], [9, 5, 7, 4], [0, 12, 12, 11]],
+};
+
 const TRACKS = {
-  night: {
-    name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
-    vibe: 'Synthwave',
-    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28 },
-    dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
-    hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
-    street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
-    hw: { kick: 'x...x...x...x.x.', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
-    bassWave: 'sawtooth', arpWave: 'square',
-    arp: [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 3, 2],
-    lead: [12, null, null, 10, null, null, 7, null, 10, null, null, null, 15, null, 12, null],
-  },
   neon: { // slower and moodier
     name: 'Neon Coast', bpm: 96, swing: 0, root: 42, scale: 'minor',
     vibe: 'Dreamy and slow',
-    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42 },
+    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42, choir: { street: 0.4, hw: 0.6 }, strings: { hw: 0.5 }, hwLead: 'celeste' },
     dirs: { N: '1 7o 6 7n 1 7o 6 5', E: '6 3 7 1 6 3 4 5', S: '1 1n 4 4 6 6 7 7o', W: '4 1 6 7 4 1 3 7n' },
     hwDirs: { N: '6 7 1 3 6 7 1 1n', E: '3 7 4 1 3 7 6 5', S: '1 6 4 5 1 6 7 7o', W: '4 5 6 3 4 5 7 1' },
     street: { kick: 'x.........x.....', snare: '........x.......', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' }, // half-time: the beat feels half as fast
@@ -58,22 +58,22 @@ const TRACKS = {
     arp: [0, 1, 2, 3, null, 2, 1, 2, 0, 1, 2, 3, null, 3, 2, 1],
     lead: [null, null, 12, null, 15, null, 12, null, 10, null, null, 7, null, null, 10, null],
   },
-  afterglow: { // faster, in a major key
-    name: 'Afterglow', bpm: 112, swing: 0, root: 47, scale: 'major',
-    vibe: 'Bright and uplifting',
-    kit: { kickHz: 170, kickTail: 0.26, snareHz: 2200, snareDur: 0.14, hatHz: 9000, pad: 'sawtooth', waves: ['square', 'sawtooth'], echo: 0.24 },
-    dirs: { N: '1 5 6 4 1 5 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 4 5 5' },
-    hwDirs: { N: '4 1 5 6 4 1 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '1 4 6 5 2 3 4 5' },
-    street: { kick: 'x...x...x...x...', snare: '....x.......x.x.', hat: '..o...o...o...o.', bass: 'x.xxx.xxx.xxx.xx' },
-    hw: { kick: 'x...x...x...x..x', snare: '....x.......x.xx', bass: 'x.x.x.x.x.x.x.x.' },
+  night: {
+    name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
+    vibe: 'Synthwave',
+    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, choir: { hw: 0.35 }, strings: { hw: 0.5 }, hwLead: 'strings' },
+    dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
+    hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
+    street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
+    hw: { kick: 'x...x...x...x.x.', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
     bassWave: 'sawtooth', arpWave: 'square',
-    arp: [0, 2, 3, 2, 1, 2, 3, 2, 0, 2, 3, 2, 1, 3, 2, 3],
-    lead: [7, null, null, 9, null, 12, null, null, 16, null, 12, null, 9, null, null, null],
+    arp: [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 1, 3, 2],
+    lead: [12, null, null, 10, null, null, 7, null, 10, null, null, null, 15, null, 12, null],
   },
   sunday: {
     name: 'Sunday', bpm: 84, swing: 0.16, root: 48, scale: 'major',
     vibe: 'Laid-back lo-fi',
-    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.2 },
+    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'harp'], echo: 0.2, strings: { hw: 0.45 }, hwLead: 'harp' },
     dirs: { N: '1 6 2 5 3 6 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 5 1n 4' },
     hwDirs: { N: '4 3 2 1 4 3 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '2 3 4 5 6 5 4 5' },
     street: { kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x......x..x...x.' },
@@ -82,17 +82,29 @@ const TRACKS = {
     arp: [0, null, 2, null, 3, null, 1, null, 2, null, 3, null, 1, null, 2, null],
     lead: [16, null, null, null, 14, null, 12, null, null, null, 9, null, null, null, 7, null],
   },
-  autobahn: {
-    name: 'Autobahn', bpm: 128, swing: 0, root: 43, scale: 'minor',
-    vibe: 'Hard and fast',
-    kit: { kickHz: 190, kickTail: 0.22, snareHz: 2400, snareDur: 0.1, hatHz: 10000, pad: 'square', waves: ['sawtooth', 'square'], echo: 0.12 },
-    dirs: { N: '1 6 3o 7o 1 6 4 5', E: '1 1 6 6 1 1 7 7', S: '4 4 1 1 6 6 5 5', W: '6 7 1 3 6 7 1 5' },
-    hwDirs: { N: '6 6 7 7 1 1 3 3', E: '3 7 1 6 3 7 4 4', S: '1 4 7 3 6 4 5 5', W: '4 6 1 5 4 6 7 7o' },
-    street: { kick: 'x...x...x...x...', snare: '....x.......x..x', hat: '..o...o...o...o.', bass: '.xxx.xxx.xxx.xxx' },
-    hw: { kick: 'x...x...x...x.xx', snare: '....x.......x..x', bass: 'x.x.x.x.x.x.x.x.' },
-    bassWave: 'square', arpWave: 'sawtooth',
-    arp: [0, 2, 1, 3, 0, 2, 1, 3, 0, 2, 1, 3, 0, 3, 2, 1],
-    lead: [12, null, 12, null, null, 15, null, null, 10, null, 10, null, null, 7, null, null],
+  cathedral: { // a choir singing Pachelbel's Canon in D: one eight-chord loop, with the tune and its variations on top
+    name: 'Cathedral', bpm: 88, swing: 0, root: 50, scale: 'major', canon: true,
+    vibe: 'Pachelbel\u2019s Canon, sung',
+    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', strings: { hw: 0.5 } },
+    dirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
+    hwDirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
+    street: { kick: 'x.......x.....x.', snare: '........x.......', hat: '....x.......x...', bass: 'x.......x.......' },
+    hw: { kick: 'x...x...x...x...', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'triangle', arpWave: 'triangle',
+    arp: [0, null, 2, null, 3, null, 2, null, 1, null, 2, null, 3, null, 2, null],
+    lead: [4, null, null, null, null, null, null, null, 2, null, null, null, null, null, null, null],
+  },
+  daybreak: { // wood and skin instead of synths: mallets, shaker and hand drums
+    name: 'Daybreak', bpm: 100, swing: 0.08, root: 46, scale: 'major',
+    vibe: 'Mallets and hand drums',
+    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'triangle'], echo: 0.3, stab: 'mallet', handHz: 200, shaker: true, choir: { hw: 0.45 }, strings: { hw: 0.4 } },
+    dirs: { N: '1 4 6 5 1 4 2 5', E: '6 4 1 5 6 4 1 1n', S: '4 1 5 6 4 1 2 5', W: '1 3 4 5 6 5 4 5' },
+    hwDirs: { N: '4 5 6 1 4 5 2 5', E: '1 5 6 4 1 5 4 5', S: '6 5 4 1 6 5 4 5', W: '2 5 1 6 2 5 4 5' },
+    street: { kick: 'x.....x...x.....', snare: '...x..x.....x.x.', hat: 'x.xxx.xxx.xxx.xx', bass: 'x..x..x...x..x..' },
+    hw: { kick: 'x...x...x...x...', snare: '...x..x..x..x.x.', bass: 'x.x.x.x.x.x.x.x.' },
+    bassWave: 'triangle', arpWave: 'mallet',
+    arp: [0, 2, 1, 3, 2, 1, 3, 2, 0, 2, 1, 3, 2, 3, 1, 2],
+    lead: [16, null, 12, null, null, 9, null, 7, null, null, 9, null, 12, null, null, null],
   },
 };
 const DIRS = ['N', 'E', 'S', 'W'];
@@ -167,6 +179,9 @@ function makeChapter(id, n) {
     if (recent.length > 4) recent.shift();
   }
 
+  // The Canon keeps its chords and tunes in every chapter: only the key and the second instrument change.
+  if (tr.canon) return { n, shift, prog: tr.prog, leads: tr.leads, arps: tr.arps, leadWave: pick(tr.kit.waves), arpWave: tr.arpWave, bass: tr.street.bass };
+
   // Chords: shuffle the movements, give each direction and zone its own, and end each 8 bars on a turnaround.
   const cells = [...CELLS[tr.scale]];
   for (let k = cells.length - 1; k > 0; k--) { const j = Math.floor(rnd() * (k + 1)); [cells[k], cells[j]] = [cells[j], cells[k]]; }
@@ -203,7 +218,7 @@ const HWY_LABEL = { mph: { low: '35', mid: '45', high: '55' }, kmh: { low: '55',
 
 /* ---------- Settings & state ---------- */
 const settings = {
-  track: store.get('rm.track', 'night'),
+  track: store.get('rm.track', 'neon'),
   hwy: store.get('rm.hwy', 'mid'),
   units: store.get('rm.units', 'mph'),
   source: store.get('rm.source', 'drive'),
@@ -211,7 +226,7 @@ const settings = {
   chords: store.get('rm.chords', 'simple'),
 };
 if (!['rich', 'simple', 'open'].includes(settings.chords)) settings.chords = 'simple';
-if (!TRACKS[settings.track]) settings.track = 'night';
+if (!TRACKS[settings.track]) settings.track = 'neon';
 if (!HWY[settings.hwy]) settings.hwy = 'mid';
 if (!(settings.rotate in ROTATE)) settings.rotate = '5';
 
@@ -256,8 +271,22 @@ function buildAudio() {
   const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
   pan.connect(lp); pan.connect(delay);
 
+  // Room: a reverb made from two seconds of fading noise, so notes ring in a space instead of stopping dead.
+  const room = ctx.createConvolver(), roomWet = ctx.createGain(); roomWet.gain.value = 0.35;
+  const ir = ctx.createBuffer(2, Math.floor(ctx.sampleRate * 2.2), ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const data = ir.getChannelData(c);
+    for (let k = 0; k < data.length; k++) data[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / data.length, 3.2);
+  }
+  room.buffer = ir; room.connect(roomWet); roomWet.connect(lp);
+  pan.connect(room);
+
+  // A rounder replacement for the bare triangle and square tones, which are what old game consoles used.
+  const warm = ctx.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.42, 0.2, 0.1, 0.05, 0.025]));
+  const hollow = ctx.createPeriodicWave(new Float32Array([0, 0, 0, 0, 0, 0, 0, 0]), new Float32Array([0, 1, 0.12, 0.5, 0.06, 0.24, 0.03, 0.1]));
+
   // Pad and stabs pass through "duck", which dips on every kick for a pumping feel.
-  const duck = ctx.createGain(); duck.connect(lp);
+  const duck = ctx.createGain(); duck.connect(lp); duck.connect(room);
   const fx = ctx.createGain(); fx.gain.value = 0.5; fx.connect(lp); // crashes and impacts
 
   const layer = {};
@@ -273,13 +302,24 @@ function buildAudio() {
 
   // Pad: four always-running voices, two detuned saws each, retuned on chord changes.
   const padFilter = ctx.createBiquadFilter(); padFilter.type = 'lowpass'; padFilter.frequency.value = 300; padFilter.Q.value = 1.2;
-  padFilter.connect(layer.pad);
+  const padDry = ctx.createGain(); padFilter.connect(padDry); padDry.connect(layer.pad);
+  // Choir: the same voices sung through three resonances, the way a mouth shapes a vowel, with a slow vibrato.
+  const choirIn = ctx.createGain(), choirOut = ctx.createGain(); choirOut.gain.value = 0; choirOut.connect(layer.pad);
+  const formants = VOWELS[0].map((hz, k) => {
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 7;
+    const g = ctx.createGain(); g.gain.value = [3.2, 1.8, 0.7][k];
+    choirIn.connect(f); f.connect(g); g.connect(choirOut);
+    return f;
+  });
+  const choirSung = ctx.createGain(); choirSung.connect(layer.pad);
+  const vibLfo = ctx.createOscillator(); vibLfo.frequency.value = 5.1;
+  const vib = ctx.createGain(); vib.gain.value = 0; vibLfo.connect(vib); vibLfo.start();
   const padOsc = [];
   for (let v = 0; v < 4; v++) {
     for (const det of [-7, 7]) {
       const o = ctx.createOscillator(); o.type = 'sawtooth'; o.detune.value = det;
       const g = ctx.createGain(); g.gain.value = 0.12;
-      o.connect(g); g.connect(padFilter); o.start();
+      o.connect(g); g.connect(padFilter); g.connect(choirIn); vib.connect(o.detune); o.start();
       padOsc.push({ o, v });
     }
   }
@@ -287,7 +327,7 @@ function buildAudio() {
   // Compass sounds. N: bell notes into the main echo. E: short plucks into their own quick, bouncing echo.
   // S: a low drone. W: a wide wash of detuned strings. The drone and strings run all the time and are retuned per chord.
   const dirGain = {};
-  for (const d of DIRS) { const g = ctx.createGain(); g.gain.value = 0; g.connect(lp); dirGain[d] = g; }
+  for (const d of DIRS) { const g = ctx.createGain(); g.gain.value = 0; g.connect(lp); g.connect(room); dirGain[d] = g; }
   const bellSend = ctx.createGain(); bellSend.gain.value = 0.35; // only a little echo, so bells don't ring into the next chord
   dirGain.N.connect(bellSend); bellSend.connect(delay);
   const eDelay = ctx.createDelay(1), eFb = ctx.createGain(); eFb.gain.value = 0.5;
@@ -315,18 +355,124 @@ function buildAudio() {
     }
   }
 
-  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, dirGain, eDelay, drone, strings };
+  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, smp: {}, roomWet, warm, hollow, dirGain, eDelay, drone, strings };
 }
 
 // The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
 // bar line. So the beat never changes, but the harmony moves slowly in town and faster on the highway.
 const CHORD_M = 70;
-const currentChord = () => chap.prog[seq.zone][seq.dir][seq.ci][settings.chords];
+const currentChord = () => chap.prog[seq.zone][seq.dir][seq.ci][TRACKS[settings.track].canon ? 'simple' : settings.chords];
 const firstChord = () => { seq.ci = 0; seq.held = 0; seq.dist = 0; };
+
+/* ---------- Recorded instruments ---------- */
+// Real recordings of a choir and an orchestra (see sounds/README.txt). Each instrument has a few recorded
+// notes; any other note is the nearest recording sped up or slowed down by a few semitones. Each instrument
+// loads on its own, and until it has loaded (or if it can't) its synthetic stand-in plays.
+const SOUNDS = {
+  choir: [52, 56, 60, 64, 68, 72, 76, 80],
+  strings: [48, 54, 58, 64, 70, 76, 82, 88],
+  marimba: [48, 52, 56, 60, 64, 68, 72, 76, 80, 84],
+  piano: [60, 64, 69, 72, 76, 81, 85, 90, 94, 98],
+  harp: [60, 66, 72, 78, 84],
+  celeste: [72, 80, 88, 96],
+  timp: [36, 42, 48],
+  hit: ['shaker', 'conga', 'congamute', 'cymbal', 'timproll'], // one-off sounds with no pitch to follow
+};
+function loadSounds() {
+  for (const [inst, notes] of Object.entries(SOUNDS)) {
+    Promise.all(notes.map(async (n) => {
+      const data = await (await fetch('sounds/' + inst + '/' + n + '.m4a')).arrayBuffer();
+      const buf = await new Promise((ok, no) => ctx.decodeAudioData(data, ok, no));
+      // Skip any silence at the front of the file, so struck notes land exactly on the beat.
+      const d = buf.getChannelData(0);
+      let peak = 0, first = 0;
+      for (let k = 0; k < d.length; k += 16) peak = Math.max(peak, Math.abs(d[k]));
+      while (first < d.length && Math.abs(d[first]) < 0.02 * peak) first++;
+      return { midi: n, buf, start: Math.max(0, first / buf.sampleRate - 0.002) };
+    })).then((list) => {
+      A.smp[inst] = list;
+      if (inst === 'strings') A.stringLp.disconnect(); // real strings take over the West sound
+    }, () => { /* keep the synthetic stand-in */ });
+  }
+}
+
+// Plays one recorded note. att and rel are the fade in and out, in seconds.
+function play(inst, t, out, midi, dur, vol, att = 0.004, rel = 0.15) {
+  const set = A.smp[inst];
+  const lo = set[0].midi - 4, hi = set[set.length - 1].midi + 4;
+  while (midi > hi) midi -= 12; // outside the instrument's range: move by octaves until it fits
+  while (midi < lo) midi += 12;
+  let best = set[0];
+  for (const v of set) if (Math.abs(v.midi - midi) < Math.abs(best.midi - midi)) best = v;
+  const rate = Math.pow(2, (midi - best.midi) / 12);
+  dur = Math.min(dur, (best.buf.duration - best.start) / rate);
+  att = Math.min(att, dur / 2); rel = Math.min(rel, dur / 2);
+  const src = ctx.createBufferSource(); src.buffer = best.buf; src.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + att);
+  g.gain.setValueAtTime(vol, t + dur - rel); g.gain.linearRampToValueAtTime(0, t + dur);
+  src.connect(g); g.connect(out); src.start(t, best.start); src.stop(t + dur + 0.05);
+  return { g, src, vol };
+}
+
+// Plays a one-off sound. Returns false if it hasn't loaded, so the caller can use its synthetic version.
+function hit(name, t, out, vol) {
+  const v = A.smp.hit && A.smp.hit.find((x) => x.midi === name);
+  if (!v) return false;
+  const src = ctx.createBufferSource(); src.buffer = v.buf;
+  const g = ctx.createGain(); g.gain.value = vol;
+  src.connect(g); g.connect(out); src.start(t, v.start);
+  return true;
+}
+
+// A timpani roll that swells through one bar and ends on the next downbeat, tuned to the key.
+function timpRoll(t, root, len) {
+  const v = A.smp.hit && A.smp.hit.find((x) => x.midi === 'timproll');
+  if (!v) return;
+  const semis = (((root - 45) % 12) + 18) % 12 - 6; // the roll was recorded on A
+  const rate = Math.pow(2, semis / 12), avail = (v.buf.duration - v.start) / rate;
+  const src = ctx.createBufferSource(); src.buffer = v.buf; src.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.1);
+  g.gain.setValueAtTime(1, t + len); g.gain.linearRampToValueAtTime(0, t + len + 0.15);
+  src.connect(g); g.connect(A.fx);
+  src.start(t, v.start + Math.max(0, avail - len) * rate); src.stop(t + len + 0.2);
+}
+
+// A held chord from a bowed or sung instrument. It is played again every few bars (a breath, or a new bow),
+// and moves at once when the chord changes. amt = how loud (0 = silent).
+const held = {};
+function sustain(name, inst, out, t, notes, amt, bars) {
+  if (!A.smp[inst]) return;
+  const st = held[name] || (held[name] = { key: '', bars: 0, voices: [] });
+  const key = amt > 0.01 ? notes.join() + '|' + amt.toFixed(2) : '';
+  if (key === st.key && (!key || ++st.bars < bars)) return;
+  if (key !== st.key) { // let go of the old chord
+    for (const { g, src, vol } of st.voices) {
+      if (g.gain.cancelAndHoldAtTime) g.gain.cancelAndHoldAtTime(t); else { g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(vol, t); }
+      g.gain.setTargetAtTime(0, t, 0.2);
+      try { src.stop(t + 1.2); } catch { /* already stopped */ }
+    }
+  }
+  st.key = key; st.bars = 0; st.voices = [];
+  if (!key) return;
+  const len = 60 / seq.bpm * 4 * bars;
+  for (const m of notes) st.voices.push(play(inst, t, out, m, len + 1, amt, 0.5, 1));
+}
+const CHOIR_VOL = 0.75, STRINGS_VOL = 0.6, WEST_VOL = 1;
+
+const VOWELS = [[700, 1100, 2600], [450, 800, 2600]]; // resonances for "ah" and "oh"
 
 function setPadChord(chord, t) {
   const root = TRACKS[settings.track].root + chap.shift;
-  const padWave = TRACKS[settings.track].kit.pad;
+  const choir = TRACKS[settings.track].kit.pad === 'choir';
+  const padWave = choir ? 'sawtooth' : TRACKS[settings.track].kit.pad;
+  A.padDry.gain.setTargetAtTime(choir ? 0 : 1, t, 0.1);
+  A.choirOut.gain.setTargetAtTime(choir && !A.smp.choir ? 1 : 0, t, 0.1); // the synthetic choir only stands in for the recorded one
+  A.vib.gain.setTargetAtTime(choir ? 9 : 0, t, 0.1);
+  A.roomWet.gain.setTargetAtTime(TRACKS[settings.track].kit.room ?? 0.35, t, 0.3);
+  // The choir sings "ah" on one chord and "oh" on the next.
+  if (choir) VOWELS[seq.ci & 1].forEach((hz, k) => A.formants[k].frequency.setTargetAtTime(hz, t, 0.4));
   for (const { o, v } of A.padOsc) {
     if (o.type !== padWave) o.type = padWave;
     // Every other pass through the sequence, the lowest voice moves up an octave for a different colour.
@@ -339,6 +485,7 @@ function setPadChord(chord, t) {
 
 // North's bell: a pure tone with fainter rings an octave and a twelfth above, so it stays in tune with the band.
 function bell(t, midi, vol) {
+  if (A.smp.celeste) return void play('celeste', t, A.dirGain.N, midi, 2.2, vol * 1.6);
   for (const [mult, v, dur] of [[1, vol, 1.0], [2, vol * 0.3, 0.5], [3, vol * 0.1, 0.3]]) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.value = mtof(midi) * mult;
@@ -375,32 +522,94 @@ function noiseHit(t, out, type, freq, dur, vol) {
   s.start(t, Math.random() * 0.3); s.stop(t + dur + 0.02);
 }
 
+// Mallet: a struck wooden bar. A pure tone that dies away, with a short high "knock" at the start.
+function mallet(t, out, midi, dur, vol, detune) {
+  for (const [mult, v, d] of [[1, vol, Math.max(dur, 0.4)], [4, vol * 0.3, 0.07]]) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = mtof(midi) * mult; o.detune.value = detune;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.001, t + d);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + d + 0.02);
+  }
+}
+
+// Voice: sung by the recorded choir when it has loaded. Otherwise a synthetic singer on "oo": A buzzy tone shaped by two resonances, easing in rather than striking.
+function voice(t, out, midi, dur, vol, detune) {
+  dur = Math.max(dur, 0.3);
+  const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(midi); o.detune.value = detune;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.06);
+  g.gain.setValueAtTime(vol, t + dur * 0.6); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  for (const [hz, v] of [[420, 3], [850, 1.6]]) {
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = hz; f.Q.value = 6;
+    const fg = ctx.createGain(); fg.gain.value = v;
+    o.connect(f); f.connect(fg); fg.connect(g);
+  }
+  if (dur > 0.6) { // a held note gets a singer's wobble, arriving a moment after the note starts
+    const v = ctx.createGain(); v.gain.setValueAtTime(0, t); v.gain.linearRampToValueAtTime(11, t + 0.5);
+    A.vibLfo.connect(v); v.connect(o.detune);
+    o.onended = () => { try { A.vibLfo.disconnect(v); } catch { /* already gone */ } };
+  }
+  g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+}
+
+// Instrument names that have a recording, how loud each plays, and the synth tone that stands in for it.
+const REAL = { mallet: 'marimba', voice: 'choir', piano: 'piano', harp: 'harp', celeste: 'celeste', strings: 'strings' };
+const REAL_VOL = { marimba: 0.85, choir: 1.7, piano: 1.6, harp: 1.0, celeste: 1.2, strings: 1.5 };
+const STANDIN = { piano: 'triangle', harp: 'triangle', celeste: 'sine', strings: 'sawtooth' };
+
 function pluck(t, out, midi, wave, dur, vol, cutoff, detune = 0) {
-  const o = ctx.createOscillator(); o.type = wave; o.frequency.value = mtof(midi); o.detune.value = detune;
-  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 2;
+  const inst = REAL[wave];
+  if (inst && A.smp[inst]) {
+    if (inst === 'choir') return play(inst, t, out, midi, Math.max(dur, 0.4), vol * REAL_VOL.choir, 0.05, 0.2);
+    if (inst === 'strings') return play(inst, t, out, midi, Math.max(dur, 0.5), vol * REAL_VOL.strings, 0.06, 0.25);
+    return play(inst, t, out, midi, Math.max(dur * 2.5, 1.2), vol * REAL_VOL[inst]); // struck or plucked: let it ring
+  }
+  wave = STANDIN[wave] || wave;
+  if (wave === 'mallet') return mallet(t, out, midi, dur, vol, detune);
+  if (wave === 'voice') return voice(t, out, midi, dur, vol, detune);
+  const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.Q.value = 1.4;
   f.frequency.setValueAtTime(cutoff, t); f.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.25), t + dur);
   const g = ctx.createGain();
-  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+  f.connect(g); g.connect(out);
+  // Above the bass register each note is two slightly out-of-tune copies, which sounds like an
+  // instrument with some width instead of a single thin beep.
+  const pair = midi >= 48 ? [-6, 6] : [0];
+  for (const d of pair) {
+    const o = ctx.createOscillator();
+    if (wave === 'triangle' || wave === 'sine') o.setPeriodicWave(A.warm);
+    else if (wave === 'square') o.setPeriodicWave(A.hollow);
+    else o.type = wave;
+    o.frequency.value = mtof(midi); o.detune.value = detune + d;
+    const og = ctx.createGain(); og.gain.value = pair.length === 2 ? 0.62 : 1;
+    o.connect(og); og.connect(f); o.start(t); o.stop(t + dur + 0.02);
+  }
 }
 
 function snareHit(t, vol) {
   const kit = TRACKS[settings.track].kit;
+  if (kit.handHz) { // a hand drum instead of a snare: a conga, or a pitched thud with a little slap
+    if (hit(vol > 0.8 ? 'conga' : 'congamute', t, A.layer.snare, 1.0 * vol)) return;
+    tom(t, kit.handHz, 0.8 * vol);
+    return noiseHit(t, A.layer.snare, 'bandpass', kit.snareHz, kit.snareDur, 0.35 * vol);
+  }
   noiseHit(t, A.layer.snare, 'bandpass', kit.snareHz, kit.snareDur, 0.9 * vol);
   pluck(t, A.layer.snare, 55, 'triangle', 0.1, 0.5 * vol, 900);
 }
 
-function tom(t, hz) {
+function tom(t, hz, vol = 0.9) {
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.frequency.setValueAtTime(hz * 1.5, t); o.frequency.exponentialRampToValueAtTime(hz, t + 0.08);
-  g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
   o.connect(g); g.connect(A.layer.snare); o.start(t); o.stop(t + 0.26);
 }
 
 // Crash cymbal plus a low thump: marks a hard launch, a new section or a new track.
 function crash(t, vol = 1) {
-  noiseHit(t, A.fx, 'highpass', 4500, 1.8, 0.7 * vol);
+  if (!hit('cymbal', t, A.fx, 1.1 * vol)) noiseHit(t, A.fx, 'highpass', 4500, 1.8, 0.7 * vol);
+  if (A.smp.timp) return void play('timp', t, A.fx, TRACKS[settings.track].root + chap.shift, 2, 1.4 * vol); // a timpani stroke on the key note
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.5);
   g.gain.setValueAtTime(0.9 * vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
@@ -416,9 +625,11 @@ function scheduleStep(t) {
     const zoned = seq.zone !== mix.zoneWant;
     if (zoned || seq.dir !== mix.dirWant) {
       seq.dir = mix.dirWant; seq.zone = mix.zoneWant;
-      if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
-      if (seq.cycle % 8 === 7) seq.cycle++; // never open a new section with a breakdown
-      firstChord();
+      if (!tr.canon) { // the Canon is one loop everywhere, so it just carries on
+        if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
+        if (seq.cycle % 8 === 7) seq.cycle++; // never open a new section with a breakdown
+        firstChord();
+      }
       if (zoned && seq.zone === 'highway') crash(t);
     }
     const n = Math.floor(seq.cycle / 8);
@@ -455,6 +666,19 @@ function scheduleStep(t) {
   const calm = surge < 0.3; // never interrupt hard acceleration
   const breakdown = form === 7 && seq.bar < 4 && calm;  // drums and bass drop out for four bars
   const build = form === 7 && seq.bar === 7 && calm;    // a snare build brings them back
+  if (i === 0) {
+    // Held chords from the recorded choir and strings. The choir is Cathedral's pad; elsewhere both join where
+    // the kit says, and the choir swells in every breakdown while the drums are away.
+    const ck = tr.kit.choir || {}, sk = tr.kit.strings || {};
+    const swell = breakdown && L.kick > 0.3 ? 0.7 : 0;
+    const low = root + 12 + chord.r, mid = low + 12;
+    sustain('choir', 'choir', A.choirSung, t, chord.iv.map((v) => low + v),
+      (tr.kit.pad === 'choir' ? 1 : Math.max((highway ? ck.hw : ck.street) || 0, swell)) * CHOIR_VOL, 2);
+    sustain('strings', 'strings', A.choirSung, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
+      ((highway ? sk.hw : sk.street) || 0) * STRINGS_VOL, 1);
+    sustain('west', 'strings', A.dirGain.W, t, chord.iv.slice(0, 3).map((v) => mid + v), mix.dirW.W > 0.03 ? WEST_VOL : 0, 1);
+    if (build && L.kick > 0.3) timpRoll(t, root, s16 * 16);
+  }
   const fill = seq.bar === 7 && i >= 12 && surge <= 0.5 && !build && L.snare > 0.01; // drum fill ending each pass
   const fillKind = seq.cycle % 3;
 
@@ -474,8 +698,9 @@ function scheduleStep(t) {
   }
   if (L.hats > 0.01) {
     const h = tr.street.hat[i]; // hats keep the same pace in every zone, so the song never seems to speed up
-    if (h === 'o') noiseHit(t, A.layer.hats, 'highpass', tr.kit.hatHz, 0.1, 0.8);
-    else if (h === 'x' && !breakdown) noiseHit(t, A.layer.hats, 'highpass', tr.kit.hatHz, 0.04, 0.8);
+    if ((h === 'o' || (h === 'x' && !breakdown)) && !(tr.kit.shaker && hit('shaker', t, A.layer.hats, 1.1))) {
+      noiseHit(t, A.layer.hats, 'highpass', tr.kit.hatHz, h === 'o' ? 0.1 : 0.04, 0.8);
+    }
   }
   if (L.bass > 0.01 && bassPattern[i] === 'x' && !breakdown) {
     // Driving groove: steady eighth notes, low on the beat and an octave up in between, with a brighter bite.
@@ -484,22 +709,37 @@ function scheduleStep(t) {
     // Under acceleration a second, hollower voice doubles the bass to thicken it.
     if (surge > 0.3) pluck(t, A.layer.bass, root - 12 + chord.r + bounce, 'square', s16 * 1.7, 0.45 * surge, 900 + 1400 * surge);
   }
-  // Arp pattern changes every pass, and again halfway through.
-  const ai = chap.arps[(seq.cycle + (seq.bar >= 4 ? 1 : 0)) % chap.arps.length][i];
-  if (L.arp > 0.01 && ai != null) {
-    pluck(t, A.layer.arp, root + 24 + chord.r + chord.iv[ai], chap.arpWave, s16 * 1.4, 0.7, (1200 + I * 3000) * bright);
-  }
-  // Lead: the highway has its own melodies, trading two phrases bar by bar with a thicker sound.
-  // The street plays one phrase every other bar, then answers with the next phrase in the second half.
-  const leads = chap.leads[seq.zone];
-  const ln = leads[(seq.cycle + (highway ? seq.bar & 1 : seq.bar >= 4 ? 1 : 0)) % leads.length][i];
-  if (L.lead > 0.01 && ln != null && form !== 2 && (driving || (seq.bar & 1) === 0)) {
-    pluck(t, A.layer.lead, root + 24 + ln, chap.leadWave, s16 * 3.5, 0.7, 2600 * bright);
-    if (highway) pluck(t, A.layer.lead, root + 24 + ln, 'sawtooth', s16 * 3.5, 0.45, 2600 * bright, 14);
+  if (tr.canon) {
+    // The Canon. From 19 mph a voice sings the slow tune, one long note per chord.
+    // From 23 mph a second part joins and changes from pass to pass:
+    // nothing, the strings in harmony, the running figure, then the figure twice as fast.
+    const base = root + 24, ci = seq.ci, moving = input.speed >= 0.4;
+    if (i === 0 && seq.held % 2 === 0 && moving) {
+      if (L.arp > 0.01) pluck(t, A.layer.arp, base + CANON.a[ci], 'voice', s16 * 17, 1, 0);
+      if (L.lead > 0.01 && (form === 1 || form === 4)) pluck(t, A.layer.lead, base + CANON.b[ci], 'strings', s16 * 17, 0.8, 0);
+    }
+    const fast = form === 3 || form === 6, every = fast ? 2 : 4;
+    if (L.lead > 0.01 && (fast || form === 2 || form === 5) && i % every === 0) {
+      pluck(t, A.layer.lead, base + CANON.fig[ci][(i / every) % 4], chap.leadWave, s16 * (fast ? 2.4 : 4.5), 0.6, 2600 * bright);
+    }
+  } else {
+    // Arp pattern changes every pass, and again halfway through.
+    const ai = chap.arps[(seq.cycle + (seq.bar >= 4 ? 1 : 0)) % chap.arps.length][i];
+    if (L.arp > 0.01 && ai != null) {
+      pluck(t, A.layer.arp, root + 24 + chord.r + chord.iv[ai], chap.arpWave, s16 * 1.4, 0.7, (1200 + I * 3000) * bright);
+    }
+    // Lead: the highway has its own melodies, trading two phrases bar by bar with a thicker sound.
+    // The street plays one phrase every other bar, then answers with the next phrase in the second half.
+    const leads = chap.leads[seq.zone];
+    const ln = leads[(seq.cycle + (highway ? seq.bar & 1 : seq.bar >= 4 ? 1 : 0)) % leads.length][i];
+    if (L.lead > 0.01 && ln != null && form !== 2 && (driving || (seq.bar & 1) === 0)) {
+      pluck(t, A.layer.lead, root + 24 + ln, chap.leadWave, s16 * 3.5, 0.7, 2600 * bright);
+      if (highway) pluck(t, A.layer.lead, root + 24 + ln, tr.kit.hwLead || tr.kit.stab || 'sawtooth', s16 * 3.5, 0.45, 2600 * bright, 14);
+    }
   }
   if (L.stabs > 0.01 && STAB[i] === 'x' && !breakdown) {
     for (let v = 0; v < 3; v++) {
-      pluck(t, A.layer.stabs, root + 24 + chord.r + chord.iv[v], 'sawtooth', s16 * 1.8, 0.45, 3500 * bright);
+      pluck(t, A.layer.stabs, root + 24 + chord.r + chord.iv[v], tr.kit.stab || 'sawtooth', s16 * 1.8, 0.45, 3500 * bright);
     }
   }
 
@@ -511,7 +751,7 @@ function scheduleStep(t) {
     bell(t, root + 36 + pool[(i + seq.bar) % pool.length], 0.5);
   }
   if (mix.dirW.E > 0.03 && E_PLUCK[i] === 'x') {
-    pluck(t, A.dirGain.E, root + 24 + chord.r + chord.iv[[0, 2, 1, 3][(i + seq.bar) % 4]], 'triangle', s16 * 0.9, 0.8, 3200);
+    pluck(t, A.dirGain.E, root + 24 + chord.r + chord.iv[[0, 2, 1, 3][(i + seq.bar) % 4]], 'harp', s16 * 0.9, 0.8, 3200);
   }
 
   seq.step = (i + 1) % 16;
@@ -521,7 +761,8 @@ function scheduleStep(t) {
     if (seq.bar === 0) seq.cycle++;
     // Next chord once the car has covered the distance: after 2, 4 or 6 bars, and never later than 8.
     seq.held++; seq.dist += input.speed * s16 * 16;
-    if (seq.held >= 8 || (seq.held % 2 === 0 && seq.dist >= CHORD_M)) {
+    // The Canon is the exception: its tune only makes sense at its own pace, so it gets a new chord every bar.
+    if (tr.canon || seq.held >= 8 || (seq.held % 2 === 0 && seq.dist >= CHORD_M)) {
       seq.ci = (seq.ci + 1) % 8; seq.held = 0; seq.dist = 0;
     }
   }
@@ -765,7 +1006,8 @@ function control() {
 /* ---------- Start / stop ---------- */
 async function start() {
   if (running) return;
-  if (!ctx) buildAudio();
+  if (!ctx) { buildAudio(); loadSounds(); }
+  for (const k in held) held[k].key = '';
   ctx.resume(); // must happen inside the tap
   running = true;
   Object.assign(seq, { step: 0, bar: 0, cycle: 0, zone: 'street', launch: false, trackStart: ctx.currentTime, bpm: TRACKS[settings.track].bpm });
