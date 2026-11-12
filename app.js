@@ -35,7 +35,8 @@ function chord(scale, tok) {
 // kit: the track's own drum sounds, pad tone, instrument tones and amount of echo.
 // Besides the plain synth tones there are recorded instruments: 'choir' (pad), 'voice', 'mallet', 'piano', 'harp', 'celeste' and 'strings'.
 // choir / strings: how much of the recorded choir and string section plays along with the pad on the street
-// and on the highway. hwLead: the instrument that doubles the melody on the highway.
+// and on the highway. Every track has both; the proportions are what set the tracks apart.
+// hwLead: the instrument that doubles the melody, quietly on the street and fully on the highway.
 // Pachelbel's Canon, written as semitones above the key note, one entry per chord of its eight-chord loop.
 // a = the famous slow descending tune, b = the second voice that joins under it, fig = the running figure.
 const CANON = {
@@ -49,7 +50,7 @@ const TRACKS = {
   neon: { // slower and moodier
     name: 'Neon Coast', bpm: 96, swing: 0, root: 42, scale: 'minor',
     vibe: 'Dreamy and slow',
-    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42, choir: { street: 0.4, hw: 0.6 }, strings: { hw: 0.5 }, hwLead: 'celeste' },
+    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42, choir: { street: 0.55, hw: 0.75 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'celeste' }, // voices lead
     dirs: { N: '1 7o 6 7n 1 7o 6 5', E: '6 3 7 1 6 3 4 5', S: '1 1n 4 4 6 6 7 7o', W: '4 1 6 7 4 1 3 7n' },
     hwDirs: { N: '6 7 1 3 6 7 1 1n', E: '3 7 4 1 3 7 6 5', S: '1 6 4 5 1 6 7 7o', W: '4 5 6 3 4 5 7 1' },
     street: { kick: 'x.........x.....', snare: '........x.......', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' }, // half-time: the beat feels half as fast
@@ -61,7 +62,7 @@ const TRACKS = {
   night: {
     name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
     vibe: 'Synthwave',
-    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, choir: { hw: 0.35 }, strings: { hw: 0.5 }, hwLead: 'strings' },
+    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, choir: { street: 0.15, hw: 0.35 }, strings: { street: 0.3, hw: 0.6 }, hwLead: 'strings' }, // synths lead, strings behind
     dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
     hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
     street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
@@ -73,7 +74,7 @@ const TRACKS = {
   sunday: {
     name: 'Sunday', bpm: 84, swing: 0.16, root: 48, scale: 'major',
     vibe: 'Laid-back lo-fi',
-    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'harp'], echo: 0.2, strings: { hw: 0.45 }, hwLead: 'harp' },
+    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'harp'], echo: 0.2, choir: { street: 0.15, hw: 0.3 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'harp' }, // piano leads
     dirs: { N: '1 6 2 5 3 6 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 5 1n 4' },
     hwDirs: { N: '4 3 2 1 4 3 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '2 3 4 5 6 5 4 5' },
     street: { kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x......x..x...x.' },
@@ -85,7 +86,7 @@ const TRACKS = {
   cathedral: { // a choir singing Pachelbel's Canon in D: one eight-chord loop, with the tune and its variations on top
     name: 'Cathedral', bpm: 88, swing: 0, root: 50, scale: 'major', canon: true,
     vibe: 'Pachelbel\u2019s Canon, sung',
-    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', strings: { hw: 0.5 } },
+    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', strings: { street: 0.3, hw: 0.55 } }, // the choir leads
     dirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     hwDirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     street: { kick: 'x.......x.....x.', snare: '........x.......', hat: '....x.......x...', bass: 'x.......x.......' },
@@ -97,7 +98,7 @@ const TRACKS = {
   daybreak: { // wood and skin instead of synths: mallets, shaker and hand drums
     name: 'Daybreak', bpm: 100, swing: 0.08, root: 46, scale: 'major',
     vibe: 'Mallets and hand drums',
-    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'triangle'], echo: 0.3, stab: 'mallet', handHz: 200, shaker: true, choir: { hw: 0.45 }, strings: { hw: 0.4 } },
+    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'triangle'], echo: 0.3, stab: 'mallet', handHz: 200, shaker: true, choir: { street: 0.25, hw: 0.5 }, strings: { street: 0.15, hw: 0.35 } }, // mallets and hand drums lead
     dirs: { N: '1 4 6 5 1 4 2 5', E: '6 4 1 5 6 4 1 1n', S: '4 1 5 6 4 1 2 5', W: '1 3 4 5 6 5 4 5' },
     hwDirs: { N: '4 5 6 1 4 5 2 5', E: '1 5 6 4 1 5 4 5', S: '6 5 4 1 6 5 4 5', W: '2 5 1 6 2 5 4 5' },
     street: { kick: 'x.....x...x.....', snare: '...x..x.....x.x.', hat: 'x.xxx.xxx.xxx.xx', bass: 'x..x..x...x..x..' },
@@ -734,7 +735,7 @@ function scheduleStep(t) {
     const ln = leads[(seq.cycle + (highway ? seq.bar & 1 : seq.bar >= 4 ? 1 : 0)) % leads.length][i];
     if (L.lead > 0.01 && ln != null && form !== 2 && (driving || (seq.bar & 1) === 0)) {
       pluck(t, A.layer.lead, root + 24 + ln, chap.leadWave, s16 * 3.5, 0.7, 2600 * bright);
-      if (highway) pluck(t, A.layer.lead, root + 24 + ln, tr.kit.hwLead || tr.kit.stab || 'sawtooth', s16 * 3.5, 0.45, 2600 * bright, 14);
+      if (highway || tr.kit.hwLead) pluck(t, A.layer.lead, root + 24 + ln, tr.kit.hwLead || tr.kit.stab || 'sawtooth', s16 * 3.5, highway ? 0.45 : 0.25, 2600 * bright, 14);
     }
   }
   if (L.stabs > 0.01 && STAB[i] === 'x' && !breakdown) {
