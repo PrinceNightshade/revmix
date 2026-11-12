@@ -608,7 +608,10 @@ function tom(t, hz, vol = 0.9) {
 }
 
 // Crash cymbal plus a low thump: marks a hard launch, a new section or a new track.
+let lastCrash = -1;
 function crash(t, vol = 1) {
+  if (t - lastCrash < 0.1) return; // two reasons to crash on the same beat still make one crash
+  lastCrash = t;
   if (!hit('cymbal', t, A.fx, 1.1 * vol)) noiseHit(t, A.fx, 'highpass', 4500, 1.8, 0.7 * vol);
   if (A.smp.timp) return void play('timp', t, A.fx, TRACKS[settings.track].root + chap.shift, 2, 1.4 * vol); // a timpani stroke on the key note
   const o = ctx.createOscillator(), g = ctx.createGain();
@@ -649,7 +652,12 @@ function scheduleStep(t) {
     }
     setPadChord(currentChord(), t);
   }
-  if (seq.launch) { seq.launch = false; crash(t); }
+  // Flooring it earns a crash only on the first beat of a bar, and only if the car is still pulling hard
+  // when that beat arrives. A short stab at the pedal between beats gets none, which keeps crashes musical.
+  if (i === 0 && seq.launch) {
+    seq.launch = false;
+    if (mix.surge > 0.5) { crash(t); seq.lastLaunch = performance.now(); }
+  }
 
   const chord = currentChord();
   const root = tr.root + chap.shift;
@@ -948,7 +956,7 @@ function control() {
   const surgeTarget = moving ? clamp((input.long - 0.1) / 0.15) : 0;
   const was = mix.surge;
   mix.surge += (surgeTarget - mix.surge) * (surgeTarget > mix.surge ? 0.3 : 0.03);
-  if (was < 0.6 && mix.surge >= 0.6 && now - seq.lastLaunch > 8000) { seq.launch = true; seq.lastLaunch = now; }
+  if (was < 0.6 && mix.surge >= 0.6 && now - seq.lastLaunch > 8000) seq.launch = true;
   const surge = mix.surge;
 
   // Zone: street or highway, with a gap between the two thresholds so it doesn't flicker.
