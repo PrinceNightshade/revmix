@@ -34,7 +34,8 @@ function chord(scale, tok) {
 // More melodies and arp patterns are derived from these below, so each track has several to rotate through.
 // kit: the track's own drum sounds, pad tone, instrument tones and amount of echo.
 // Besides the plain synth tones there are recorded instruments: 'choir' (pad), 'voice', 'mallet', 'piano', 'harp', 'celeste' and 'strings'.
-// choir / strings: how much of the recorded choir and string section plays along with the pad on the street
+// arps: tones the rippling pattern may use in later chapters (defaults to waves).
+// choir / strings / brass: how much of the recorded choir, string section and trombones plays along with the pad on the street
 // and on the highway. Every track has both; the proportions are what set the tracks apart.
 // idle: the instrument that plays a few quiet notes while the car is stopped.
 // hwLead: the instrument that doubles the melody, quietly on the street and fully on the highway.
@@ -51,7 +52,7 @@ const TRACKS = {
   neon: { // slower and moodier
     name: 'Neon Coast', bpm: 96, swing: 0, root: 42, scale: 'minor',
     vibe: 'Dreamy and slow',
-    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42, choir: { street: 0.55, hw: 0.75 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'celeste', idle: 'celeste' }, // voices lead
+    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'flute'], arps: ['sawtooth', 'harp'], echo: 0.42, stab: 'pizz', choir: { street: 0.55, hw: 0.75 }, strings: { street: 0.2, hw: 0.45 }, brass: { hw: 0.3 }, hwLead: 'celeste', idle: 'celeste' }, // voices lead
     dirs: { N: '1 7o 6 7n 1 7o 6 5', E: '6 3 7 1 6 3 4 5', S: '1 1n 4 4 6 6 7 7o', W: '4 1 6 7 4 1 3 7n' },
     hwDirs: { N: '6 7 1 3 6 7 1 1n', E: '3 7 4 1 3 7 6 5', S: '1 6 4 5 1 6 7 7o', W: '4 5 6 3 4 5 7 1' },
     street: { kick: 'x.........x.....', snare: '........x.......', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' }, // half-time: the beat feels half as fast
@@ -63,7 +64,7 @@ const TRACKS = {
   night: {
     name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
     vibe: 'Synthwave',
-    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, choir: { street: 0.15, hw: 0.35 }, strings: { street: 0.3, hw: 0.6 }, hwLead: 'strings', idle: 'harp' }, // synths lead, strings behind
+    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, stab: 'trumpet', choir: { street: 0.15, hw: 0.35 }, strings: { street: 0.3, hw: 0.6 }, brass: { hw: 0.7 }, hwLead: 'strings', idle: 'harp' }, // synths lead, strings and brass behind
     dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
     hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
     street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
@@ -75,36 +76,36 @@ const TRACKS = {
   sunday: {
     name: 'Sunday', bpm: 84, swing: 0.16, root: 48, scale: 'major',
     vibe: 'Laid-back lo-fi',
-    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'harp'], echo: 0.2, choir: { street: 0.15, hw: 0.3 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'harp', idle: 'piano' }, // piano leads
+    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'flute', 'harp'], arps: ['triangle', 'pizz', 'harp'], echo: 0.2, stab: 'trumpet', choir: { street: 0.15, hw: 0.3 }, strings: { street: 0.2, hw: 0.45 }, brass: { hw: 0.35 }, hwLead: 'harp', idle: 'piano' }, // piano leads
     dirs: { N: '1 6 2 5 3 6 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 5 1n 4' },
     hwDirs: { N: '4 3 2 1 4 3 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '2 3 4 5 6 5 4 5' },
     street: { kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x......x..x...x.' },
     hw: { kick: 'x..x...x..x..x..', snare: '....x..x....x...', bass: 'x.x.x.x.x.x.x.x.' },
-    bassWave: 'triangle', arpWave: 'triangle',
+    bassWave: 'bass', arpWave: 'triangle',
     arp: [0, null, 2, null, 3, null, 1, null, 2, null, 3, null, 1, null, 2, null],
     lead: [16, null, null, null, 14, null, 12, null, null, null, 9, null, null, null, 7, null],
   },
   cathedral: { // a choir singing Pachelbel's Canon in D: one eight-chord loop, with the tune and its variations on top
     name: 'Cathedral', bpm: 88, swing: 0, root: 50, scale: 'major', canon: true,
     vibe: 'Pachelbel\u2019s Canon, sung',
-    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', choir: { street: 0.65, hw: 0.7 }, strings: { street: 0.6, hw: 0.85 }, idle: 'harp' }, // choir and strings share the lead
+    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'oboe', 'harp', 'flute'], echo: 0.3, room: 0.7, stab: 'voice', choir: { street: 0.65, hw: 0.7 }, strings: { street: 0.6, hw: 0.85 }, brass: { hw: 0.4 }, idle: 'harp' }, // choir and strings share the lead
     dirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     hwDirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     street: { kick: 'x.......x.....x.', snare: '........x.......', hat: '....x.......x...', bass: 'x.......x.......' },
     hw: { kick: 'x...x...x...x...', snare: '....x.......x...', bass: 'x.x.x.x.x.x.x.x.' },
-    bassWave: 'triangle', arpWave: 'triangle',
+    bassWave: 'bass', arpWave: 'triangle',
     arp: [0, null, 2, null, 3, null, 2, null, 1, null, 2, null, 3, null, 2, null],
     lead: [4, null, null, null, null, null, null, null, 2, null, null, null, null, null, null, null],
   },
   daybreak: { // wood and skin instead of synths: mallets, shaker and hand drums
     name: 'Daybreak', bpm: 100, swing: 0.08, root: 46, scale: 'major',
     vibe: 'Mallets and hand drums',
-    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'triangle'], echo: 0.3, stab: 'mallet', handHz: 200, shaker: true, choir: { street: 0.25, hw: 0.5 }, strings: { street: 0.15, hw: 0.35 }, idle: 'mallet' }, // mallets and hand drums lead
+    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'flute'], arps: ['mallet', 'pizz'], echo: 0.3, stab: 'mallet', hwLead: 'flute', handHz: 200, shaker: true, choir: { street: 0.25, hw: 0.5 }, strings: { street: 0.15, hw: 0.35 }, brass: { hw: 0.35 }, idle: 'mallet' }, // mallets and hand drums lead
     dirs: { N: '1 4 6 5 1 4 2 5', E: '6 4 1 5 6 4 1 1n', S: '4 1 5 6 4 1 2 5', W: '1 3 4 5 6 5 4 5' },
     hwDirs: { N: '4 5 6 1 4 5 2 5', E: '1 5 6 4 1 5 4 5', S: '6 5 4 1 6 5 4 5', W: '2 5 1 6 2 5 4 5' },
     street: { kick: 'x.....x...x.....', snare: '...x..x.....x.x.', hat: 'x.xxx.xxx.xxx.xx', bass: 'x..x..x...x..x..' },
     hw: { kick: 'x...x...x...x...', snare: '...x..x..x..x.x.', bass: 'x.x.x.x.x.x.x.x.' },
-    bassWave: 'triangle', arpWave: 'mallet',
+    bassWave: 'bass', arpWave: 'mallet',
     arp: [0, 2, 1, 3, 2, 1, 3, 2, 0, 2, 1, 3, 2, 3, 1, 2],
     lead: [16, null, 12, null, null, 9, null, 7, null, null, 9, null, 12, null, null, null],
   },
@@ -203,7 +204,7 @@ function makeChapter(id, n) {
     highway: [1, 2, 3, 4].map((m) => makePhrase(pent, tr.seed + n * 104729 + 5000 + m * 613, true)),
   };
   const arps = tr.arps.map((_, k) => tr.arps[(k + n) % tr.arps.length]);
-  return { n, shift, prog, leads, arps, leadWave: pick(tr.kit.waves), arpWave: pick(tr.kit.waves), bass: pick(BASS_POOL) };
+  return { n, shift, prog, leads, arps, leadWave: pick(tr.kit.waves), arpWave: pick(tr.kit.arps || tr.kit.waves), bass: pick(BASS_POOL) };
 }
 // Each compass direction has a signature sound. Their volumes follow the heading, so NE is half N, half E.
 const DIR_SOUND = { N: 'glass', E: 'pluck', S: 'drone', W: 'strings' };
@@ -383,6 +384,15 @@ const SOUNDS = {
   harp: [60, 66, 72, 78, 84],
   celeste: [72, 80, 88, 96],
   timp: [36, 42, 48],
+  bass: [24, 27, 30, 33, 36, 39, 42, 45, 48],          // double basses, plucked
+  pizz: [55, 61, 67, 73, 79, 85, 91],                  // violins, plucked
+  tremolo: [64, 70, 76, 82],                           // violins, shimmering
+  flute: [72, 75, 78, 81, 84, 87, 90, 93, 96],
+  oboe: [58, 61, 64, 67, 70, 73, 76, 79, 82, 84],
+  trombone: [46, 52, 58, 64, 67],                      // held notes
+  trumpet: [55, 61, 67, 73, 79],                       // short stabs
+  pianoloud: [60, 64, 69, 72, 76, 81, 85, 89, 93],     // the same piano and marimba, struck hard
+  marimbaloud: [48, 52, 56, 60, 64, 68, 72, 76, 80, 84],
   hit: ['shaker', 'conga', 'congamute', 'cymbal', 'timproll'], // one-off sounds with no pitch to follow
 };
 function loadSounds() {
@@ -404,21 +414,22 @@ function loadSounds() {
 }
 
 // Plays one recorded note. att and rel are the fade in and out, in seconds.
+const SKIP_IN = { flute: 0.15, oboe: 0.12 }; // wind notes swell in slowly; start a little way into the recording
 function play(inst, t, out, midi, dur, vol, att = 0.004, rel = 0.15) {
-  const set = A.smp[inst];
+  const set = A.smp[inst], skip = SKIP_IN[inst] || 0;
   const lo = set[0].midi - 4, hi = set[set.length - 1].midi + 4;
   while (midi > hi) midi -= 12; // outside the instrument's range: move by octaves until it fits
   while (midi < lo) midi += 12;
   let best = set[0];
   for (const v of set) if (Math.abs(v.midi - midi) < Math.abs(best.midi - midi)) best = v;
   const rate = Math.pow(2, (midi - best.midi) / 12);
-  dur = Math.min(dur, (best.buf.duration - best.start) / rate);
+  dur = Math.min(dur, (best.buf.duration - best.start - skip) / rate);
   att = Math.min(att, dur / 2); rel = Math.min(rel, dur / 2);
   const src = ctx.createBufferSource(); src.buffer = best.buf; src.playbackRate.value = rate;
   const g = ctx.createGain();
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + att);
   g.gain.setValueAtTime(vol, t + dur - rel); g.gain.linearRampToValueAtTime(0, t + dur);
-  src.connect(g); g.connect(out); src.start(t, best.start); src.stop(t + dur + 0.05);
+  src.connect(g); g.connect(out); src.start(t, best.start + skip); src.stop(t + dur + 0.05);
   return { g, src, vol };
 }
 
@@ -466,7 +477,7 @@ function sustain(name, inst, out, t, notes, amt, bars) {
   const len = 60 / seq.bpm * 4 * bars;
   for (const m of notes) st.voices.push(play(inst, t, out, m, len + 1, amt, 0.5, 1));
 }
-const CHOIR_VOL = 0.75, STRINGS_VOL = 0.6, WEST_VOL = 1;
+const CHOIR_VOL = 0.75, STRINGS_VOL = 0.6, WEST_VOL = 1, BRASS_VOL = 0.6;
 
 const VOWELS = [[700, 1100, 2600], [450, 800, 2600]]; // resonances for "ah" and "oh"
 
@@ -561,16 +572,19 @@ function voice(t, out, midi, dur, vol, detune) {
 }
 
 // Instrument names that have a recording, how loud each plays, and the synth tone that stands in for it.
-const REAL = { mallet: 'marimba', voice: 'choir', piano: 'piano', harp: 'harp', celeste: 'celeste', strings: 'strings' };
-const REAL_VOL = { marimba: 0.85, choir: 1.7, piano: 1.6, harp: 1.0, celeste: 1.2, strings: 1.5 };
-const STANDIN = { piano: 'triangle', harp: 'triangle', celeste: 'sine', strings: 'sawtooth' };
+const REAL = { mallet: 'marimba', voice: 'choir', piano: 'piano', harp: 'harp', celeste: 'celeste', strings: 'strings', bass: 'bass', pizz: 'pizz', flute: 'flute', oboe: 'oboe', trumpet: 'trumpet' };
+const REAL_VOL = { marimba: 0.85, choir: 1.7, piano: 1.6, harp: 1.0, celeste: 1.2, strings: 1.5, bass: 0.45, pizz: 1.2, flute: 1.4, oboe: 1.3, trumpet: 1.0 };
+const BOWED = { strings: 1, flute: 1, oboe: 1 }; // held for the length of the note, not left to ring
+const LOUD = { piano: 'pianoloud', marimba: 'marimbaloud' }; // struck harder when the car is working hard
+const STANDIN = { piano: 'triangle', harp: 'triangle', celeste: 'sine', strings: 'sawtooth', bass: 'triangle', pizz: 'triangle', flute: 'sine', oboe: 'square', trumpet: 'sawtooth' };
 
 function pluck(t, out, midi, wave, dur, vol, cutoff, detune = 0) {
   const inst = REAL[wave];
   if (inst && A.smp[inst]) {
     if (inst === 'choir') return play(inst, t, out, midi, Math.max(dur, 0.4), vol * REAL_VOL.choir, 0.05, 0.2);
-    if (inst === 'strings') return play(inst, t, out, midi, Math.max(dur, 0.5), vol * REAL_VOL.strings, 0.06, 0.25);
-    return play(inst, t, out, midi, Math.max(dur * 2.5, 1.2), vol * REAL_VOL[inst]); // struck or plucked: let it ring
+    if (BOWED[inst]) return play(inst, t, out, midi, Math.max(dur, 0.5), vol * REAL_VOL[inst], 0.05, 0.25);
+    const hard = LOUD[inst] && A.smp[LOUD[inst]] && (mix.surge > 0.4 || seq.zone === 'highway');
+    return play(hard ? LOUD[inst] : inst, t, out, midi, Math.max(dur * 2.5, 1.2), vol * REAL_VOL[inst]); // struck or plucked: let it ring
   }
   wave = STANDIN[wave] || wave;
   if (wave === 'mallet') return mallet(t, out, midi, dur, vol, detune);
@@ -703,7 +717,14 @@ function scheduleStep(t) {
     sustain('strings', 'strings', A.choirSung, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
       ((highway ? sk.hw : sk.street) || 0) * STRINGS_VOL, 1);
     sustain('west', 'strings', A.dirGain.W, t, chord.iv.slice(0, 3).map((v) => mid + v), mix.dirW.W > 0.03 ? WEST_VOL : 0, 1);
-    if (build && L.kick > 0.3) timpRoll(t, root, s16 * 16);
+    // Trombones hold the chord on the highway, and whenever the car is accelerating briskly.
+    const bk = tr.kit.brass || {};
+    sustain('brass', 'trombone', A.choirSung, t, [low, low + chord.iv[2]], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
+    if (build && L.kick > 0.3) {
+      timpRoll(t, root, s16 * 16);
+      // Shimmering violins swell through the bar before a new chapter.
+      if (A.smp.tremolo) for (const v of chord.iv.slice(0, 3)) play('tremolo', t, A.fx, mid + v, s16 * 16, 0.9, s16 * 14, 0.1);
+    }
   }
   const fill = seq.bar === 7 && i >= 12 && surge <= 0.5 && !build && L.snare > 0.01; // drum fill ending each pass
   const fillKind = seq.cycle % 3;
