@@ -14,23 +14,15 @@ const store = {
 /* ---------- Harmony ---------- */
 const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
 // A chord is written as a scale degree (1-7); a trailing "n" or "o" is ignored now.
-// Result: r = semitones from the key note, fifth = the chord's fifth, and iv = four chord tones, in three flavours
-// that are meant to sound clearly different:
-//   simple - the plain three-note chord with its root doubled on top. Clear: plainly happy or sad.
-//   rich   - no fifth; the third with a seventh and a ninth stacked above it. Lush, hazy, jazzy.
-//   open   - no third at all; root, fifth and ninth, spread wide. Neither happy nor sad: airy and spacious.
+// Result: r = semitones from the key note, fifth = the chord's fifth, and iv = its tones:
+// the plain three-note chord with the root doubled on top.
 function chord(scale, tok) {
   const d = parseInt(tok, 10) - 1;
   const note = (k) => scale[k % 7] + 12 * Math.floor(k / 7);
   let r = note(d);
-  const [third, fifth, seventh, ninth] = [2, 4, 6, 8].map((k) => note(d + k) - r);
-  const nine = ninth === 13 ? null : ninth; // a ninth only one semitone above the octave grates, so it is left out
+  const [third, fifth] = [2, 4].map((k) => note(d + k) - r);
   if (r > 5) r -= 12; // keep roots near the key note so the bass stays in register
-  return {
-    simple: { r, fifth, iv: [0, third, fifth, 12] },
-    rich: { r, fifth, iv: [0, third, seventh, nine ?? fifth + 12] },
-    open: { r, fifth, iv: [0, fifth, nine ?? 12, fifth + 12] },
-  };
+  return { r, fifth, iv: [0, third, fifth, 12] };
 }
 
 /* ---------- Tracks ---------- */
@@ -234,10 +226,8 @@ const settings = {
   units: store.get('rm.units', 'mph'),
   source: store.get('rm.source', 'drive'),
   rotate: store.get('rm.rotate', '5'),
-  chords: store.get('rm.chords', 'simple'),
   compass: store.get('rm.compass', 'surround'),
 };
-if (!['rich', 'simple', 'open'].includes(settings.chords)) settings.chords = 'simple';
 if (!['blend', 'surround'].includes(settings.compass)) settings.compass = 'surround';
 if (!TRACKS[settings.track]) settings.track = 'neon';
 if (!HWY[settings.hwy]) settings.hwy = 'mid';
@@ -387,7 +377,7 @@ function buildAudio() {
 // The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
 // bar line. So the beat never changes, but the harmony moves slowly in town and faster on the highway.
 const CHORD_M = 70;
-const currentChord = () => chap.prog[seq.zone][seq.dir][seq.ci][TRACKS[settings.track].canon ? 'simple' : settings.chords];
+const currentChord = () => chap.prog[seq.zone][seq.dir][seq.ci];
 const firstChord = () => { seq.ci = 0; seq.held = 0; seq.dist = 0; };
 
 /* ---------- Recorded instruments ---------- */
