@@ -207,6 +207,7 @@ function makeChapter(id, n) {
 // Each compass direction has a signature sound. Their volumes follow the heading, so NE is half N, half E.
 const DIR_SOUND = { N: 'glass', E: 'pluck', S: 'drone', W: 'strings' };
 const DIR_VOL = { N: 0.2, E: 0.2, S: 0.26, W: 0.11 };
+const SECT_AT = { N: 'choir', W: 'strings', S: 'brass' };
 const E_PLUCK = 'x..x..x..x.x..x.';
 const STAB = '...x..x...x..x..';
 
@@ -318,6 +319,15 @@ function buildAudio() {
     return f;
   });
   const choirSung = ctx.createGain(); choirSung.connect(layer.pad);
+  // In Surround the three held sections each live at a compass point: choir north, strings west, brass south.
+  const sect = {};
+  for (const name of ['choir', 'strings', 'brass']) {
+    const g = ctx.createGain();
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 20000; tone.Q.value = 0.5;
+    const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    g.connect(tone); tone.connect(pn); pn.connect(choirSung);
+    sect[name] = { g, tone, pn };
+  }
   const vibLfo = ctx.createOscillator(); vibLfo.frequency.value = 5.1;
   const vib = ctx.createGain(); vib.gain.value = 0; vibLfo.connect(vib); vibLfo.start();
   const padOsc = [];
@@ -371,7 +381,7 @@ function buildAudio() {
     }
   }
 
-  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, dirTone, dirPan, dirRoom, eDelay, drone, strings };
+  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, sect, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, dirTone, dirPan, dirRoom, eDelay, drone, strings };
 }
 
 // The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
@@ -720,14 +730,14 @@ function scheduleStep(t) {
     const ck = tr.kit.choir || {}, sk = tr.kit.strings || {};
     const swell = breakdown && L.kick > 0.3 ? 0.7 : 0;
     const low = root + 12 + chord.r, mid = low + 12;
-    sustain('choir', 'choir', A.choirSung, t, chord.iv.map((v) => low + v),
+    sustain('choir', 'choir', A.sect.choir.g, t, chord.iv.map((v) => low + v),
       Math.max((highway ? ck.hw : ck.street) || 0, swell) * CHOIR_VOL, 2);
-    sustain('strings', 'strings', A.choirSung, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
+    sustain('strings', 'strings', A.sect.strings.g, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
       ((highway ? sk.hw : sk.street) || 0) * STRINGS_VOL, 1);
     sustain('west', 'strings', A.dirGain.W, t, chord.iv.slice(0, 3).map((v) => mid + v), mix.dirW.W > 0.03 ? WEST_VOL : 0, 1);
     // Trombones hold the chord on the highway, and whenever the car is accelerating briskly.
     const bk = tr.kit.brass || {};
-    sustain('brass', 'trombone', A.choirSung, t, [low, low + chord.fifth], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
+    sustain('brass', 'trombone', A.sect.brass.g, t, [low, low + chord.fifth], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
     if (build && L.kick > 0.3) {
       timpRoll(t, root, s16 * 16);
       // Shimmering violins swell through the bar before a new chapter.
@@ -936,8 +946,10 @@ function onMotion(e) {
   if (hasLin) {
     motion.lin = true;
     const dot = a.x * ux + a.y * uy + a.z * uz;
-    const h = Math.hypot(a.x - dot * ux, a.y - dot * uy, a.z - dot * uz) / 9.81;
-    motion.horiz += (h - motion.horiz) * 0.04;
+    const hx = a.x - dot * ux, hy = a.y - dot * uy, hz = a.z - dot * uz; // the push along the road surface, in phone coordinates
+    motion.horiz += (Math.hypot(hx, hy, hz) / 9.81 - motion.horiz) * 0.04;
+    motion.hv = motion.hv || [0, 0, 0];
+    motion.hv[0] += (hx - motion.hv[0]) * 0.12; motion.hv[1] += (hy - motion.hv[1]) * 0.12; motion.hv[2] += (hz - motion.hv[2]) * 0.12;
   }
 }
 
@@ -994,6 +1006,11 @@ function simStep(dt) {
 // Heading for the compass sounds. GPS knows the true heading but reports it a second or two late; the gyroscope
 // feels a turn at once but drifts. So the gyroscope moves the heading during a turn and GPS gently pulls it
 // true afterwards. The gyroscope's left/right sense is also checked against GPS and flipped if they disagree.
+// Which way is forward? The phone can be mounted at any angle, so the app learns it: whenever GPS shows the car
+// speeding up or slowing down in a straight line, the direction the phone feels that push is the car's forward
+// axis. Once learned, the phone's own sensor gives true forward acceleration at once, and a corner (a sideways
+// push) no longer looks like the throttle.
+const ahead = { v: [0, 0, 0], sure: 0 };
 const fuse = { h: null, yaw: 0, lastFix: 0, lastGps: null, agree: +store.get('rm.yaw', 0) || 0 }; // agree is remembered between drives
 const wrap180 = (a) => ((a % 360) + 540) % 360 - 180;
 
@@ -1016,13 +1033,25 @@ function driveStep(dt) {
   let long = gps.long;
   const stale = performance.now() - gps.fixAt > 4000;
   input.gain = stale ? 0 : gps.long;
+  // Learn the forward axis, then read forward acceleration straight off it.
+  let felt = null;
+  if (motion.lin && motion.hv) {
+    const hv = motion.hv, size = Math.hypot(hv[0], hv[1], hv[2]);
+    if (!stale && Math.abs(gps.long) > 0.06 && Math.abs(turn) < 3 && input.speed > 2 && size > 0.4) {
+      const w = Math.sign(gps.long) * Math.min(1, Math.abs(gps.long) / 0.15);
+      for (let k = 0; k < 3; k++) ahead.v[k] = ahead.v[k] * 0.995 + hv[k] * w;
+      ahead.sure = Math.hypot(ahead.v[0], ahead.v[1], ahead.v[2]);
+    }
+    if (ahead.sure > 25) felt = (hv[0] * ahead.v[0] + hv[1] * ahead.v[1] + hv[2] * ahead.v[2]) / ahead.sure / 9.81;
+  }
   // The motion sensor may sharpen what GPS reports, but only a little, and never in a corner: it feels
   // cornering and bumps exactly as it feels the throttle, so on its own it would invent acceleration.
-  if (Math.abs(long) > 0.03 && Math.abs(turn) < 4) long = Math.sign(long) * Math.max(Math.abs(long), Math.min(fwd, Math.abs(long) * 1.5 + 0.05));
+  if (felt != null) long = clamp(felt, gps.long - 0.3, gps.long + 0.3); // immediate, and kept honest by GPS
+  else if (Math.abs(long) > 0.03 && Math.abs(turn) < 4) long = Math.sign(long) * Math.max(Math.abs(long), Math.min(fwd, Math.abs(long) * 1.5 + 0.05));
   if (stale) long = 0;
-  input.long += (long - input.long) * Math.min(1, dt * 4);
+  input.long += (long - input.long) * Math.min(1, dt * (felt != null ? 8 : 4));
   // GPS speed arrives a second or two late. The motion sensor is immediate, so it is what says the push is over.
-  input.push = motion.lin ? fwd : Math.max(0, long);
+  input.push = felt != null ? Math.max(0, felt) : motion.lin ? fwd : Math.max(0, long);
   input.turn = turn;
   if (gps.heading == null) fuse.h = null;
   else if (fuse.h == null || !motion.seen) fuse.h = gps.heading;
@@ -1078,21 +1107,35 @@ function control() {
   // Blend: only the direction you face is heard; neighbours cross-fade (cos², so two always add up to a whole).
   // Surround: all four play at once, pinned to the compass. What you face is in front (centred, clear, full),
   // what is beside you is in that speaker, and what is behind is quiet, dull and distant. Turning swings them round.
+  // The choir (north), strings (west) and brass (south) are placed the same way, so the effect is carried by the main sound.
   const presence = clamp(mph / 8), now2 = ctx.currentTime, around = settings.compass === 'surround';
   DIRS.forEach((d, k) => {
     const rel = input.heading == null ? null : (k * 90 - input.heading) * RAD; // where this sound sits, relative to the nose of the car
     const side = rel == null ? 0 : Math.sin(rel), front = rel == null ? 0 : (Math.cos(rel) + 1) / 2; // -1 left..1 right; 0 behind..1 ahead
     const facing = rel == null ? 0 : Math.max(0, Math.cos(rel));
-    const want = rel == null ? 0 : around ? 0.75 * (0.18 + 0.82 * Math.pow(front, 1.5)) : facing * facing;
+    const want = rel == null ? 0 : around ? 1.1 * (0.18 + 0.82 * Math.pow(front, 1.5)) : facing * facing;
     mix.dirW[d] += (want * presence - mix.dirW[d]) * (around ? 0.2 : 0.08);
     A.dirGain[d].gain.setTargetAtTime(mix.dirW[d] * DIR_VOL[d], now2, around ? 0.12 : 0.3);
     if (A.dirPan[d].pan) A.dirPan[d].pan.setTargetAtTime(around ? side * 0.9 : 0, now2, 0.12);
     A.dirTone[d].frequency.setTargetAtTime(around ? 600 * Math.pow(33, front) : 20000, now2, 0.12);
     A.dirRoom[d].gain.setTargetAtTime(around ? 0.4 + 1.2 * (1 - front) : 1, now2, 0.2);
+    const sc = A.sect[SECT_AT[d]]; // the section that lives at this compass point, if any
+    if (sc) {
+      const on = around && rel != null;
+      sc.g.gain.setTargetAtTime(on ? 0.45 + 0.8 * Math.pow(front, 1.3) : 1, now2, 0.15);
+      if (sc.pn.pan) sc.pn.pan.setTargetAtTime(on ? side * 0.85 : 0, now2, 0.15);
+      sc.tone.frequency.setTargetAtTime(on ? 900 * Math.pow(22, front) : 20000, now2, 0.15);
+    }
   });
-  let I = highway ? 0.75 + 0.25 * clamp((input.speed - hwy) / (hwy * 0.5)) : 0.65 * clamp(eff / 11.2);
+  // Brightness keeps climbing all the way to highway speed, so 25-45 mph no longer sounds the same throughout.
+  let I = highway ? 0.75 + 0.25 * clamp((input.speed - hwy) / (hwy * 0.5)) : 0.7 * Math.pow(clamp(eff / hwy), 0.7);
   I = moving ? clamp(I + surge * 0.15) : 0;
   mix.intensity = I;
+  // The choir, strings and brass swell with speed instead of sitting at one level, so they don't mask the layers
+  // joining, and the whole mix gets a little louder as road noise rises. (Cathedral's choir is its main sound, so it stays fuller.)
+  const floor = TRACKS[settings.track].kit.pad === 'choir' ? 0.7 : 0.3;
+  A.choirSung.gain.setTargetAtTime(floor + (1.15 - floor) * clamp(mph / 40), ctx.currentTime, 0.6);
+  if (running) A.master.gain.setTargetAtTime(0.7 * (0.85 + 0.2 * clamp(mph / 55)), ctx.currentTime, 0.8);
 
   const t = ctx.currentTime;
   for (const name of LAYERS) {
