@@ -1,7 +1,7 @@
 {
   "name": "Revmix",
   "short_name": "Revmix",
-  "description": "Music that follows the car.",
+  "description": "Revmix: a driving soundtrack. Music that builds with your speed.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
