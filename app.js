@@ -36,6 +36,7 @@ function chord(scale, tok) {
 // Besides the plain synth tones there are recorded instruments: 'choir' (pad), 'voice', 'mallet', 'piano', 'harp', 'celeste' and 'strings'.
 // choir / strings: how much of the recorded choir and string section plays along with the pad on the street
 // and on the highway. Every track has both; the proportions are what set the tracks apart.
+// idle: the instrument that plays a few quiet notes while the car is stopped.
 // hwLead: the instrument that doubles the melody, quietly on the street and fully on the highway.
 // Pachelbel's Canon, written as semitones above the key note, one entry per chord of its eight-chord loop.
 // a = the famous slow descending tune, b = the second voice that joins under it, fig = the running figure.
@@ -50,7 +51,7 @@ const TRACKS = {
   neon: { // slower and moodier
     name: 'Neon Coast', bpm: 96, swing: 0, root: 42, scale: 'minor',
     vibe: 'Dreamy and slow',
-    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42, choir: { street: 0.55, hw: 0.75 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'celeste' }, // voices lead
+    kit: { kickHz: 110, kickTail: 0.45, snareHz: 2600, snareDur: 0.3, hatHz: 6000, pad: 'triangle', waves: ['triangle', 'sine'], echo: 0.42, choir: { street: 0.55, hw: 0.75 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'celeste', idle: 'celeste' }, // voices lead
     dirs: { N: '1 7o 6 7n 1 7o 6 5', E: '6 3 7 1 6 3 4 5', S: '1 1n 4 4 6 6 7 7o', W: '4 1 6 7 4 1 3 7n' },
     hwDirs: { N: '6 7 1 3 6 7 1 1n', E: '3 7 4 1 3 7 6 5', S: '1 6 4 5 1 6 7 7o', W: '4 5 6 3 4 5 7 1' },
     street: { kick: 'x.........x.....', snare: '........x.......', hat: '..o...o...o..xx.', bass: 'x..x..x.x..x..x.' }, // half-time: the beat feels half as fast
@@ -62,7 +63,7 @@ const TRACKS = {
   night: {
     name: 'Night Drive', bpm: 104, swing: 0, root: 45, scale: 'minor',
     vibe: 'Synthwave',
-    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, choir: { street: 0.15, hw: 0.35 }, strings: { street: 0.3, hw: 0.6 }, hwLead: 'strings' }, // synths lead, strings behind
+    kit: { kickHz: 150, kickTail: 0.32, snareHz: 1800, snareDur: 0.18, hatHz: 7500, pad: 'sawtooth', waves: ['sawtooth', 'square'], echo: 0.28, choir: { street: 0.15, hw: 0.35 }, strings: { street: 0.3, hw: 0.6 }, hwLead: 'strings', idle: 'harp' }, // synths lead, strings behind
     dirs: { N: '1 6 3n 7 1 6 4 5', E: '6 7 1 1n 6 7 3 5', S: '1 4 6 5 1 4 7o 3', W: '4 6 1 7 4 6 3n 7' },
     hwDirs: { N: '3 7 1 6 3 7 4 5', E: '6 3 7 1 6 3 4 7o', S: '1 7 6 7 1 7 6 5', W: '4 5 6 7o 4 5 3 3n' },
     street: { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: 'x.x.x.x.x.x.x.xx' },
@@ -74,7 +75,7 @@ const TRACKS = {
   sunday: {
     name: 'Sunday', bpm: 84, swing: 0.16, root: 48, scale: 'major',
     vibe: 'Laid-back lo-fi',
-    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'harp'], echo: 0.2, choir: { street: 0.15, hw: 0.3 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'harp' }, // piano leads
+    kit: { kickHz: 120, kickTail: 0.25, snareHz: 1300, snareDur: 0.12, hatHz: 5000, pad: 'triangle', waves: ['piano', 'harp'], echo: 0.2, choir: { street: 0.15, hw: 0.3 }, strings: { street: 0.2, hw: 0.45 }, hwLead: 'harp', idle: 'piano' }, // piano leads
     dirs: { N: '1 6 2 5 3 6 2 5', E: '4 5 3 6 4 5 1 1n', S: '6 4 1 5 6 4 2 5', W: '2 5 1 6 2 5 1n 4' },
     hwDirs: { N: '4 3 2 1 4 3 2 5', E: '1 3 4 5 1 3 4 2', S: '6 5 4 5 6 5 4 1', W: '2 3 4 5 6 5 4 5' },
     street: { kick: 'x......x..x.....', snare: '....x.......x...', hat: 'x.x.x.x.x.x.x.x.', bass: 'x......x..x...x.' },
@@ -86,7 +87,7 @@ const TRACKS = {
   cathedral: { // a choir singing Pachelbel's Canon in D: one eight-chord loop, with the tune and its variations on top
     name: 'Cathedral', bpm: 88, swing: 0, root: 50, scale: 'major', canon: true,
     vibe: 'Pachelbel\u2019s Canon, sung',
-    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', choir: { street: 0.65, hw: 0.7 }, strings: { street: 0.6, hw: 0.85 } }, // choir and strings share the lead
+    kit: { kickHz: 95, kickTail: 0.5, snareHz: 1500, snareDur: 0.35, hatHz: 4500, pad: 'choir', waves: ['strings', 'harp', 'voice'], echo: 0.3, room: 0.7, stab: 'voice', choir: { street: 0.65, hw: 0.7 }, strings: { street: 0.6, hw: 0.85 }, idle: 'harp' }, // choir and strings share the lead
     dirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     hwDirs: { N: CANON.chords, E: CANON.chords, S: CANON.chords, W: CANON.chords },
     street: { kick: 'x.......x.....x.', snare: '........x.......', hat: '....x.......x...', bass: 'x.......x.......' },
@@ -98,7 +99,7 @@ const TRACKS = {
   daybreak: { // wood and skin instead of synths: mallets, shaker and hand drums
     name: 'Daybreak', bpm: 100, swing: 0.08, root: 46, scale: 'major',
     vibe: 'Mallets and hand drums',
-    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'triangle'], echo: 0.3, stab: 'mallet', handHz: 200, shaker: true, choir: { street: 0.25, hw: 0.5 }, strings: { street: 0.15, hw: 0.35 } }, // mallets and hand drums lead
+    kit: { kickHz: 105, kickTail: 0.28, snareHz: 1200, snareDur: 0.05, hatHz: 6500, pad: 'triangle', waves: ['mallet', 'triangle'], echo: 0.3, stab: 'mallet', handHz: 200, shaker: true, choir: { street: 0.25, hw: 0.5 }, strings: { street: 0.15, hw: 0.35 }, idle: 'mallet' }, // mallets and hand drums lead
     dirs: { N: '1 4 6 5 1 4 2 5', E: '6 4 1 5 6 4 1 1n', S: '4 1 5 6 4 1 2 5', W: '1 3 4 5 6 5 4 5' },
     hwDirs: { N: '4 5 6 1 4 5 2 5', E: '1 5 6 4 1 5 4 5', S: '6 5 4 1 6 5 4 5', W: '2 5 1 6 2 5 4 5' },
     street: { kick: 'x.....x...x.....', snare: '...x..x.....x.x.', hat: 'x.xxx.xxx.xxx.xx', bass: 'x..x..x...x..x..' },
@@ -210,7 +211,8 @@ const DIR_VOL = { N: 0.2, E: 0.2, S: 0.26, W: 0.11 };
 const E_PLUCK = 'x..x..x..x.x..x.';
 const STAB = '...x..x...x..x..';
 
-const HARD_G = 0.3; // forward acceleration, in g, that counts as flooring it
+const HARD_G = 0.4; // speed gain, in g, that counts as flooring it (0-60 mph in about 7 seconds). Meant to be a rare treat.
+const CRASH_GAP = 30000; // at least this many ms between two launch crashes
 const LAYERS = ['pad', 'bass', 'kick', 'hats', 'snare', 'arp', 'lead', 'stabs'];
 // Speed in mph at which each layer joins. Everything is in by 25 mph.
 const JOIN = { pad: -99, bass: 3, kick: 7, hats: 11, snare: 15, arp: 19, lead: 23 };
@@ -234,7 +236,9 @@ if (!(settings.rotate in ROTATE)) settings.rotate = '5';
 
 // What the music listens to. speed in m/s, long in g (+ = accelerating), turn in deg/s (+ = right),
 // heading in degrees clockwise from north (null until known).
-const input = { speed: 0, long: 0, turn: 0, heading: null, push: 0 }; // push = forward force felt right now, in g
+const input = { speed: 0, long: 0, turn: 0, heading: null, push: 0, gain: 0 };
+// push = force felt right now, in g (any direction: it can't tell a corner from the throttle).
+// gain = speed actually being gained, in g, measured from the speed itself. Slower to react, but it can't be fooled.
 const mix = {
   intensity: 0, boost: 0, brake: 0, surge: 0, bright: 0,
   zoneWant: 'street', dirWant: 'N',
@@ -250,7 +254,7 @@ let ctx, A; // A = audio nodes
 // ci = which of the 8 chords is sounding; held and dist = bars and metres travelled since it arrived.
 // zone and dir only change on a bar line, so switches land in time.
 // bpm is fixed for the whole drive: it is set by the track you choose and kept when tracks rotate.
-const seq = { step: 0, bar: 0, cycle: 0, ci: 0, held: 0, dist: 0, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
+const seq = { step: 0, bar: 0, cycle: 0, ci: 0, held: 0, dist: 0, idle: 0, idlePat: null, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
 let chap = makeChapter(settings.track, 0); // the chapter being played
 let nextTime = 0, schedTimer = null, ctlTimer = null;
 
@@ -272,6 +276,7 @@ function buildAudio() {
 
   const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
   pan.connect(lp); pan.connect(delay);
+  const idle = ctx.createGain(); idle.gain.value = 0.3; idle.connect(pan); // the quiet notes played while waiting
 
   // Room: a reverb made from two seconds of fading noise, so notes ring in a space instead of stopping dead.
   const room = ctx.createConvolver(), roomWet = ctx.createGain(); roomWet.gain.value = 0.35;
@@ -357,7 +362,7 @@ function buildAudio() {
     }
   }
 
-  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, smp: {}, roomWet, warm, hollow, dirGain, eDelay, drone, strings };
+  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, eDelay, drone, strings };
 }
 
 // The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
@@ -608,12 +613,15 @@ function tom(t, hz, vol = 0.9) {
   o.connect(g); g.connect(A.layer.snare); o.start(t); o.stop(t + 0.26);
 }
 
-// Crash cymbal plus a low thump: marks a hard launch, a new section or a new track.
-let lastCrash = -1;
-function crash(t, vol = 1) {
-  if (t - lastCrash < 0.1) return; // two reasons to crash on the same beat still make one crash
+let lastCrash = -1, lastCymbal = -1;
+// A low drum stroke marks a new section. The cymbal on top is kept for one thing only: flooring it.
+function crash(t, vol = 1, cymbal = false) {
+  if (cymbal && t - lastCymbal > 0.1) {
+    lastCymbal = t;
+    if (!hit('cymbal', t, A.fx, 1.1 * vol)) noiseHit(t, A.fx, 'highpass', 4500, 1.8, 0.7 * vol);
+  }
+  if (t - lastCrash < 0.1) return; // two reasons to mark the same beat still make one stroke
   lastCrash = t;
-  if (!hit('cymbal', t, A.fx, 1.1 * vol)) noiseHit(t, A.fx, 'highpass', 4500, 1.8, 0.7 * vol);
   if (A.smp.timp) return void play('timp', t, A.fx, TRACKS[settings.track].root + chap.shift, 2, 1.4 * vol); // a timpani stroke on the key note
   const o = ctx.createOscillator(), g = ctx.createGain();
   o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.5);
@@ -626,6 +634,20 @@ function scheduleStep(t) {
   const i = seq.step;
 
   if (i === 0) {
+    // Flooring it earns a cymbal crash only on the first beat of a bar, and only if the car is still gaining
+    // speed hard at that moment and the motion sensor agrees there is still a push (it can cancel, never cause).
+    // The crash also opens a new phrase on a new chord, so it always sounds like the start of something.
+    if (seq.launch) {
+      seq.launch = false;
+      if (input.gain > HARD_G * 0.85 && input.push > HARD_G * 0.5) {
+        crash(t, 1, true); seq.lastLaunch = performance.now();
+        if (!tr.canon) {
+          if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
+          if (seq.cycle % 8 === 7) seq.cycle++;
+          seq.ci = (seq.ci + 1) % 8; seq.held = 0; seq.dist = 0;
+        }
+      }
+    }
     // Section changes land on a bar line. A new direction or zone restarts the 8-bar chord sequence.
     const zoned = seq.zone !== mix.zoneWant;
     if (zoned || seq.dir !== mix.dirWant) {
@@ -652,12 +674,6 @@ function scheduleStep(t) {
       if (mix.level.kick > 0.5) crash(t, 0.7);
     }
     setPadChord(currentChord(), t);
-  }
-  // Flooring it earns a crash only on the first or third beat of a bar, and only if the car is still being
-  // pushed hard at that moment. Lifting off before the beat gets none, which keeps crashes rare and musical.
-  if (i % 8 === 0 && seq.launch) {
-    seq.launch = false;
-    if (input.long > HARD_G * 0.85 && input.push > HARD_G * 0.6) { crash(t); seq.lastLaunch = performance.now(); }
   }
 
   const chord = currentChord();
@@ -753,6 +769,11 @@ function scheduleStep(t) {
     }
   }
 
+  if (seq.idlePat && seq.idlePat[i] != null && input.speed < 0.4) {
+    const k = seq.idlePat[i], tones = chord.iv.slice(0, 3);
+    pluck(t, A.idle, root + 24 + chord.r + tones[k % 3] + (k >= 3 ? 12 : 0), tr.kit.idle || 'celeste', s16 * 6, 0.6, 2400);
+  }
+
   // Compass sounds that are played as notes (the drone and strings sound continuously).
   if (mix.dirW.N > 0.03 && (i === 0 || i === 6 || i === 10)) {
     // Bells only use notes of the chord that also belong to the melody's five-note scale, so they never clash with it.
@@ -766,7 +787,21 @@ function scheduleStep(t) {
 
   seq.step = (i + 1) % 16;
   // While the car is stopped the music holds its chord: the story only moves when you do.
+  if (seq.step === 0 && input.speed < 0.4) {
+    // Waiting at a light. After a couple of bars the music stops simply holding: the chord drifts on
+    // every four bars, and a quiet instrument plays a few notes over it, different each bar.
+    seq.idle++;
+    if (seq.idle >= 4 && seq.idle % 4 === 0) seq.ci = (seq.ci + 1) % 8;
+    seq.idlePat = null;
+    if (seq.idle >= 2 && seq.idle % 3 !== 1) { // every third bar is left empty, for space
+      const rnd = seeded(tr.seed + seq.idle * 7919);
+      const slots = [0, 3, 6, 8, 10, 12, 14].filter(() => rnd() < 0.42).slice(0, 4);
+      seq.idlePat = Array(16).fill(null);
+      for (const st of slots) seq.idlePat[st] = Math.floor(rnd() * 6); // which note of the chord, over two octaves
+    }
+  }
   if (seq.step === 0 && input.speed >= 0.4) {
+    seq.idle = 0; seq.idlePat = null;
     seq.bar = (seq.bar + 1) % 8;
     if (seq.bar === 0) seq.cycle++;
     // Next chord once the car has covered the distance: after 2, 4 or 6 bars, and never later than 8.
@@ -911,8 +946,8 @@ const sim = { gas: false, floor: false, brake: false, steer: 0, v: 0, heading: 0
 function simStep(dt) {
   let a;
   if (sim.brake) a = -6.5;
-  else if (sim.floor) a = 3.6 * (1 - sim.v / 50); // foot down
-  else if (sim.gas) a = 1.3 * (1 - sim.v / 50);   // gentle
+  else if (sim.floor) a = 5.4 * (1 - sim.v / 70); // foot down: about 0.55 g from rest
+  else if (sim.gas) a = 2.4 * (1 - sim.v / 90);   // brisk: about 0.24 g, enough for the driving beat but not a crash
   else a = -0.25 - 0.012 * sim.v;
   const before = sim.v;
   sim.v = Math.max(0, sim.v + a * dt);
@@ -920,6 +955,7 @@ function simStep(dt) {
   input.speed = sim.v;
   input.long += (real - input.long) * 0.3;
   input.push = Math.max(0, real);
+  input.gain = input.long;
   input.turn = sim.v > 1 ? sim.steer * 28 : 0;
   sim.heading = (sim.heading + input.turn * dt + 360) % 360;
   input.heading = sim.heading;
@@ -933,8 +969,12 @@ function driveStep(dt) {
   const lat = (input.speed * turn * RAD) / 9.81;
   const fwd = Math.sqrt(Math.max(0, motion.horiz ** 2 - lat ** 2));
   let long = gps.long;
-  if (Math.abs(long) > 0.03) long = Math.sign(long) * Math.max(Math.abs(long), Math.min(fwd, 0.6));
-  if (performance.now() - gps.fixAt > 4000) long = 0;
+  const stale = performance.now() - gps.fixAt > 4000;
+  input.gain = stale ? 0 : gps.long;
+  // The motion sensor may sharpen what GPS reports, but only a little, and never in a corner: it feels
+  // cornering and bumps exactly as it feels the throttle, so on its own it would invent acceleration.
+  if (Math.abs(long) > 0.03 && Math.abs(turn) < 4) long = Math.sign(long) * Math.max(Math.abs(long), Math.min(fwd, Math.abs(long) * 1.5 + 0.05));
+  if (stale) long = 0;
   input.long += (long - input.long) * Math.min(1, dt * 4);
   // GPS speed arrives a second or two late. The motion sensor is immediate, so it is what says the push is over.
   input.push = motion.lin ? fwd : Math.max(0, long);
@@ -962,8 +1002,8 @@ function control() {
   const was = mix.surge;
   mix.surge += (surgeTarget - mix.surge) * (surgeTarget > mix.surge ? 0.3 : 0.03);
   // The driving groove above answers ordinary brisk acceleration. A crash is kept for a properly hard push.
-  const hard = moving && input.long >= HARD_G;
-  if (hard && !mix.hard && now - seq.lastLaunch > 8000) seq.launch = true;
+  const hard = moving && input.gain >= HARD_G; // judged on real speed gain only
+  if (hard && !mix.hard && now - seq.lastLaunch > CRASH_GAP) seq.launch = true;
   mix.hard = hard;
   const surge = mix.surge;
 
@@ -1165,7 +1205,9 @@ function render() {
   const speed = running ? `${Math.round(input.speed * (kmh ? 3.6 : 2.23694))} ${kmh ? 'km/h' : 'mph'}` : '';
   const zone = !running ? '' : input.speed < 0.4 ? 'Idle' : mix.surge > 0.5 ? 'Surge' : mix.zoneWant === 'highway' ? 'Highway' : 'Street';
   const point = input.heading == null ? '' : POINTS[Math.round(input.heading / 45) % 8];
-  $('#zone').textContent = [speed, zone, point, running ? 'Ch ' + (chap.n + 1) : ''].filter(Boolean).join(' · ');
+  // The acceleration the crash is judged on, shown while it is above a gentle 0.05 g, so the threshold can be checked on the road.
+  const gain = running && input.gain > 0.05 ? input.gain.toFixed(2) + ' g' : '';
+  $('#zone').textContent = [speed, zone, gain, point, running ? 'Ch ' + (chap.n + 1) : ''].filter(Boolean).join(' · ');
   for (const b of $('#hwy').children) b.textContent = HWY_LABEL[kmh ? 'kmh' : 'mph'][b.dataset.v];
   for (const b of $('#tracks').children) b.setAttribute('aria-pressed', b.dataset.id === settings.track); // follows track rotation
   $('#status').textContent = statusText;
