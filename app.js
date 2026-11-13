@@ -972,6 +972,7 @@ function stopSensors() {
   geoId = null;
   Object.assign(gps, { target: 0, long: 0, lastV: null, lastPos: null, anchor: null, heading: null, fixAt: 0, acc: null });
   Object.assign(motion, { turn: 0, horiz: 0, seen: false, grav: null, lin: false });
+  Object.assign(fuse, { h: null, yaw: 0, lastFix: 0, lastGps: null }); // the learned left/right sense is kept
 }
 
 async function holdWake() {
@@ -1000,10 +1001,25 @@ function simStep(dt) {
   input.heading = sim.heading;
 }
 
+// Heading for the compass sounds. GPS knows the true heading but reports it a second or two late; the gyroscope
+// feels a turn at once but drifts. So the gyroscope moves the heading during a turn and GPS gently pulls it
+// true afterwards. The gyroscope's left/right sense is also checked against GPS and flipped if they disagree.
+const fuse = { h: null, yaw: 0, lastFix: 0, lastGps: null, agree: +store.get('rm.yaw', 0) || 0 }; // agree is remembered between drives
+const wrap180 = (a) => ((a % 360) + 540) % 360 - 180;
+
 function driveStep(dt) {
+  fuse.yaw += motion.turn * dt;
+  if (gps.fixAt !== fuse.lastFix) { // a new GPS reading: did the gyroscope turn the same way GPS says we did?
+    if (fuse.lastGps != null && gps.heading != null && input.speed > 3) {
+      const dG = wrap180(gps.heading - fuse.lastGps);
+      if (Math.abs(dG) > 4 && Math.abs(fuse.yaw) > 4) { fuse.agree = clamp(fuse.agree + Math.sign(dG * fuse.yaw), -8, 8); store.set('rm.yaw', fuse.agree); }
+    }
+    fuse.lastFix = gps.fixAt; fuse.lastGps = gps.heading; fuse.yaw = 0;
+  }
+  const yawSign = fuse.agree < -2 ? -1 : 1;
   input.speed += (gps.target - input.speed) * Math.min(1, dt * 2.5);
   if (input.speed < 0.3 && gps.target === 0) input.speed = 0;
-  const turn = Math.abs(motion.turn) > 1.5 && input.speed > 1 ? motion.turn : 0;
+  const turn = Math.abs(motion.turn) > 1.5 && input.speed > 1 ? motion.turn * yawSign : 0;
   // The accelerometer reacts faster than GPS; GPS says whether it is speeding up or slowing down.
   const lat = (input.speed * turn * RAD) / 9.81;
   const fwd = Math.sqrt(Math.max(0, motion.horiz ** 2 - lat ** 2));
@@ -1018,7 +1034,14 @@ function driveStep(dt) {
   // GPS speed arrives a second or two late. The motion sensor is immediate, so it is what says the push is over.
   input.push = motion.lin ? fwd : Math.max(0, long);
   input.turn = turn;
-  input.heading = gps.heading;
+  if (gps.heading == null) fuse.h = null;
+  else if (fuse.h == null || !motion.seen) fuse.h = gps.heading;
+  else {
+    fuse.h += turn * dt; // the gyroscope turns it now...
+    fuse.h += wrap180(gps.heading - fuse.h) * Math.min(1, dt * (Math.abs(turn) > 4 ? 0.1 : 0.7)); // ...and GPS corrects it, mostly once the turn is over
+    fuse.h = (fuse.h + 360) % 360;
+  }
+  input.heading = fuse.h;
 }
 
 /* ---------- Mixing: inputs -> sound ---------- */
