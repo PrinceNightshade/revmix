@@ -61,6 +61,6 @@ h1 { margin: 0; font-size: 20px; letter-spacing: 0.04em; }
 #brake.held { background: #6b2020; border-color: #ff5a4f; }
 
 .hint { margin: 0; color: var(--dim); font-size: 13px; text-align: center; }
-#update { border: 0; background: none; color: var(--a); font-size: 13px; padding: 8px; cursor: pointer; text-decoration: underline; }
+#update, #lrcheck { border: 0; background: none; color: var(--a); font-size: 13px; padding: 8px; cursor: pointer; text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
 .hint a { color: inherit; }

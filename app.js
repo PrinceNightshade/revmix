@@ -13,18 +13,24 @@ const store = {
 
 /* ---------- Harmony ---------- */
 const SCALES = { minor: [0, 2, 3, 5, 7, 8, 10], major: [0, 2, 4, 5, 7, 9, 11] };
-// A chord is written as a scale degree (1-7). It gets a seventh on top by default;
-// "n" puts a ninth on top and "o" an octave. Result: r = semitones from the key note, and the chord tones
-// in three flavours: rich (as written), simple (plain three-note chord, doubled at the octave) and
-// open (no middle note at all: root, fifth, octave, fifth).
+// A chord is written as a scale degree (1-7); a trailing "n" or "o" is ignored now.
+// Result: r = semitones from the key note, fifth = the chord's fifth, and iv = four chord tones, in three flavours
+// that are meant to sound clearly different:
+//   simple - the plain three-note chord with its root doubled on top. Clear: plainly happy or sad.
+//   rich   - no fifth; the third with a seventh and a ninth stacked above it. Lush, hazy, jazzy.
+//   open   - no third at all; root, fifth and ninth, spread wide. Neither happy nor sad: airy and spacious.
 function chord(scale, tok) {
   const d = parseInt(tok, 10) - 1;
-  const top = tok.endsWith('n') ? 8 : tok.endsWith('o') ? 7 : 6;
   const note = (k) => scale[k % 7] + 12 * Math.floor(k / 7);
   let r = note(d);
-  const iv = [0, 2, 4, top].map((k) => note(d + k) - r);
+  const [third, fifth, seventh, ninth] = [2, 4, 6, 8].map((k) => note(d + k) - r);
+  const nine = ninth === 13 ? null : ninth; // a ninth only one semitone above the octave grates, so it is left out
   if (r > 5) r -= 12; // keep roots near the key note so the bass stays in register
-  return { rich: { r, iv }, simple: { r, iv: [iv[0], iv[1], iv[2], 12] }, open: { r, iv: [0, iv[2], 12, iv[2] + 12] } };
+  return {
+    simple: { r, fifth, iv: [0, third, fifth, 12] },
+    rich: { r, fifth, iv: [0, third, seventh, nine ?? fifth + 12] },
+    open: { r, fifth, iv: [0, fifth, nine ?? 12, fifth + 12] },
+  };
 }
 
 /* ---------- Tracks ---------- */
@@ -229,8 +235,10 @@ const settings = {
   source: store.get('rm.source', 'drive'),
   rotate: store.get('rm.rotate', '5'),
   chords: store.get('rm.chords', 'simple'),
+  compass: store.get('rm.compass', 'surround'),
 };
 if (!['rich', 'simple', 'open'].includes(settings.chords)) settings.chords = 'simple';
+if (!['blend', 'surround'].includes(settings.compass)) settings.compass = 'surround';
 if (!TRACKS[settings.track]) settings.track = 'neon';
 if (!HWY[settings.hwy]) settings.hwy = 'mid';
 if (!(settings.rotate in ROTATE)) settings.rotate = '5';
@@ -335,11 +343,21 @@ function buildAudio() {
   // Compass sounds. N: bell notes into the main echo. E: short plucks into their own quick, bouncing echo.
   // S: a low drone. W: a wide wash of detuned strings. The drone and strings run all the time and are retuned per chord.
   const dirGain = {};
-  for (const d of DIRS) { const g = ctx.createGain(); g.gain.value = 0; g.connect(lp); g.connect(room); dirGain[d] = g; }
+  // Each compass sound can be placed around the listener: a tone filter (duller = further behind),
+  // a left-right position, and its own amount of room (more = further away).
+  const dirTone = {}, dirPan = {}, dirRoom = {};
+  for (const d of DIRS) {
+    const g = ctx.createGain(); g.gain.value = 0; dirGain[d] = g;
+    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 20000; tone.Q.value = 0.5;
+    const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    const rm = ctx.createGain();
+    g.connect(tone); tone.connect(pn); pn.connect(lp); pn.connect(rm); rm.connect(room);
+    dirTone[d] = tone; dirPan[d] = pn; dirRoom[d] = rm;
+  }
   const bellSend = ctx.createGain(); bellSend.gain.value = 0.35; // only a little echo, so bells don't ring into the next chord
   dirGain.N.connect(bellSend); bellSend.connect(delay);
   const eDelay = ctx.createDelay(1), eFb = ctx.createGain(); eFb.gain.value = 0.5;
-  dirGain.E.connect(eDelay); eDelay.connect(eFb); eFb.connect(eDelay); eDelay.connect(lp);
+  dirGain.E.connect(eDelay); eDelay.connect(eFb); eFb.connect(eDelay); eDelay.connect(dirTone.E);
 
   const droneLp = ctx.createBiquadFilter(); droneLp.type = 'lowpass'; droneLp.frequency.value = 320; droneLp.connect(dirGain.S);
   const drone = [['sine', -12, 0.5], ['sawtooth', 0, 0.3], ['sawtooth', 0.08, 0.3]].map(([type, semis, vol]) => {
@@ -363,7 +381,7 @@ function buildAudio() {
     }
   }
 
-  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, eDelay, drone, strings };
+  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, dirTone, dirPan, dirRoom, eDelay, drone, strings };
 }
 
 // The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
@@ -719,7 +737,7 @@ function scheduleStep(t) {
     sustain('west', 'strings', A.dirGain.W, t, chord.iv.slice(0, 3).map((v) => mid + v), mix.dirW.W > 0.03 ? WEST_VOL : 0, 1);
     // Trombones hold the chord on the highway, and whenever the car is accelerating briskly.
     const bk = tr.kit.brass || {};
-    sustain('brass', 'trombone', A.choirSung, t, [low, low + chord.iv[2]], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
+    sustain('brass', 'trombone', A.choirSung, t, [low, low + chord.fifth], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
     if (build && L.kick > 0.3) {
       timpRoll(t, root, s16 * 16);
       // Shimmering violins swell through the bar before a new chapter.
@@ -1043,13 +1061,21 @@ function control() {
   const eff = Math.max(0, input.speed + boost * 2 - brake * 1.5); // m/s, nudged by the pedals
   const mph = moving ? eff * 2.23694 : 0;
 
-  // Compass sounds: each one's share is cos² of how far the heading is from its direction,
-  // so two neighbours always add up to a whole and fade smoothly into each other. They fade in over the first 8 mph.
-  const presence = clamp(mph / 8);
+  // Compass sounds, fading in over the first 8 mph. Two ways to hear them:
+  // Blend: only the direction you face is heard; neighbours cross-fade (cos², so two always add up to a whole).
+  // Surround: all four play at once, pinned to the compass. What you face is in front (centred, clear, full),
+  // what is beside you is in that speaker, and what is behind is quiet, dull and distant. Turning swings them round.
+  const presence = clamp(mph / 8), now2 = ctx.currentTime, around = settings.compass === 'surround';
   DIRS.forEach((d, k) => {
-    const c = input.heading == null ? 0 : Math.max(0, Math.cos((input.heading - k * 90) * RAD));
-    mix.dirW[d] += (c * c * presence - mix.dirW[d]) * 0.08;
-    A.dirGain[d].gain.setTargetAtTime(mix.dirW[d] * DIR_VOL[d], ctx.currentTime, 0.3);
+    const rel = input.heading == null ? null : (k * 90 - input.heading) * RAD; // where this sound sits, relative to the nose of the car
+    const side = rel == null ? 0 : Math.sin(rel), front = rel == null ? 0 : (Math.cos(rel) + 1) / 2; // -1 left..1 right; 0 behind..1 ahead
+    const facing = rel == null ? 0 : Math.max(0, Math.cos(rel));
+    const want = rel == null ? 0 : around ? 0.75 * (0.18 + 0.82 * Math.pow(front, 1.5)) : facing * facing;
+    mix.dirW[d] += (want * presence - mix.dirW[d]) * (around ? 0.2 : 0.08);
+    A.dirGain[d].gain.setTargetAtTime(mix.dirW[d] * DIR_VOL[d], now2, around ? 0.12 : 0.3);
+    if (A.dirPan[d].pan) A.dirPan[d].pan.setTargetAtTime(around ? side * 0.9 : 0, now2, 0.12);
+    A.dirTone[d].frequency.setTargetAtTime(around ? 600 * Math.pow(33, front) : 20000, now2, 0.12);
+    A.dirRoom[d].gain.setTargetAtTime(around ? 0.4 + 1.2 * (1 - front) : 1, now2, 0.2);
   });
   let I = highway ? 0.75 + 0.25 * clamp((input.speed - hwy) / (hwy * 0.5)) : 0.65 * clamp(eff / 11.2);
   I = moving ? clamp(I + surge * 0.15) : 0;
@@ -1071,7 +1097,9 @@ function control() {
   A.wet.gain.setTargetAtTime(Math.max(0.05, TRACKS[settings.track].kit.echo - 0.1 * mix.bright), t, 0.5);
   A.lp.frequency.setTargetAtTime(18000 * Math.pow(0.03, brake), t, 0.12); // braking closes the filter
   const turnN = clamp(input.turn / 25, -1, 1);
-  if (A.pan.pan) A.pan.pan.setTargetAtTime(turnN * 0.8, t, 0.2);
+  // The melody leans as you steer. In Blend it leans into the turn. In Surround it must go the other way:
+  // the music stays put in the world while the car turns, so turning right moves everything to your left.
+  if (A.pan.pan) A.pan.pan.setTargetAtTime(turnN * (settings.compass === 'surround' ? -0.6 : 0.8), t, 0.2);
   A.fb.gain.setTargetAtTime(0.28 + 0.4 * Math.abs(turnN), t, 0.2);
 
   if (settings.source === 'sim') statusText = 'Simulating';
@@ -1173,6 +1201,18 @@ function buildUI() {
   }
 
   $('#go').onclick = () => (running ? stop() : start());
+  // Left/right check: one note in the left speaker, then two in the right.
+  $('#lrcheck').onclick = () => {
+    if (!ctx) return void ($('#lrcheck').textContent = 'Press Start first, then try again');
+    $('#lrcheck').textContent = 'Left/right check: 1 note left, then 2 right';
+    [[0, -1], [1.0, 1], [1.4, 1]].forEach(([at, side]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(), p = ctx.createStereoPanner();
+      const t = ctx.currentTime + 0.1 + at;
+      o.frequency.value = 660; p.pan.value = side;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      o.connect(g); g.connect(p); p.connect(ctx.destination); o.start(t); o.stop(t + 0.35);
+    });
+  };
 
   const hold = (el, prop) => {
     const on = (e) => { e.preventDefault(); sim[prop] = true; el.classList.add('held'); };
