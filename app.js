@@ -961,7 +961,7 @@ function stopSensors() {
   geoId = null;
   Object.assign(gps, { target: 0, long: 0, lastV: null, lastPos: null, anchor: null, heading: null, fixAt: 0, acc: null });
   Object.assign(motion, { turn: 0, horiz: 0, seen: false, grav: null, lin: false });
-  Object.assign(step, { above: false, last: 0, gaps: [], cadence: 0, smooth: 0, run: false, live: false });
+  Object.assign(step, { above: false, last: 0, gaps: [], cadence: 0, smooth: 0, run: false, live: false, echo: 0, oneLeg: 0, doubled: false });
   Object.assign(fuse, { h: null, yaw: 0, lastFix: 0, lastGps: null }); // the learned left/right sense is kept
 }
 
@@ -975,12 +975,20 @@ async function holdWake() {
 // counting those jolts gives steps per minute. Walking: one step per beat, so the tempo is your pace.
 // Running: one step per half-beat (the tempo is half your pace) with the fuller "highway" music, whose
 // eighth-note bass then lands on every step. Layers join as the pace picks up, as they do with speed in a car.
-const step = { lp: 9.81, sm: 0, amp: 1.5, above: false, last: 0, gaps: [], cadence: 0, smooth: 0, run: false, live: false, tempoAt: 0 };
+// A phone in a side trouser pocket rides on one thigh, so it feels that leg's step strongly and the other leg's
+// only faintly: counted naively, that gives half the true pace. Three checks catch it (the third is in the code below). First, nobody walks at fewer
+// than 70 steps a minute, so a count that low must be one leg. Second, the recent bounce is compared with itself
+// half a "step" earlier: if a fainter copy of the jolt sits there, that is the other foot, and the pace is doubled.
+const step = { lp: 9.81, sm: 0, amp: 1.5, above: false, last: 0, gaps: [], cadence: 0, smooth: 0, run: false, live: false, tempoAt: 0,
+  buf: new Float32Array(512), at: 0, lastMs: 0, every: 16.7, echo: 0, oneLeg: 0, doubled: false };
 function countStep(mag, ms) {
   step.live = true;
   step.lp += (mag - step.lp) * 0.02;                 // the steady pull of gravity
   step.sm += (mag - step.lp - step.sm) * 0.25;       // the bounce on top of it
   step.amp = Math.max(step.amp * 0.9985, step.sm);   // how big recent bounces have been
+  step.buf[step.at++ & 511] = step.sm;               // the last few seconds of bounce, for the one-leg check
+  if (step.lastMs && ms - step.lastMs < 100) step.every += (ms - step.lastMs - step.every) * 0.05; // ms between sensor readings
+  step.lastMs = ms;
   const thr = Math.max(0.7, 0.4 * step.amp);
   if (step.sm > thr) {
     if (!step.above && ms - step.last > 260) {
@@ -988,7 +996,21 @@ function countStep(mag, ms) {
       if (gap < 1500) {
         step.gaps.push(gap); if (step.gaps.length > 6) step.gaps.shift();
         const sorted = [...step.gaps].sort((a, b) => a - b);
-        step.cadence = 60000 / sorted[sorted.length >> 1]; // the middle of the last few gaps, so one odd step doesn't matter
+        const period = sorted[sorted.length >> 1];         // the middle of the last few gaps, so one odd step doesn't matter
+        const raw = 60000 / period;
+        // Is there a fainter jolt halfway between the ones being counted?
+        const n = Math.min(240, Math.round(period / step.every)), half = n >> 1;
+        let same = 0, shifted = 0;
+        for (let k = 1; k <= 2 * n && k + half < 512; k++) {
+          const a = step.buf[(step.at - k) & 511], b = step.buf[(step.at - k - half) & 511];
+          same += a * a; shifted += a * b;
+        }
+        step.echo += ((same > 0 ? shifted / same : 0) - step.echo) * 0.3;
+        // ...or, at a slow-looking count, jolts far too hard for a slow walk: that is running, felt by one leg.
+        const oneLeg = raw < 70 || (raw < 95 && (step.echo > 0 || step.amp > 5.5));
+        step.oneLeg = clamp(step.oneLeg + (oneLeg ? 1 : -1), 0, 4); // needs a few steps in a row to change its mind
+        if (step.oneLeg >= 3) step.doubled = true; else if (step.oneLeg <= 1) step.doubled = false;
+        step.cadence = step.doubled ? raw * 2 : raw;
       } else step.gaps = [];
       step.last = ms;
     }
