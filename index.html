@@ -27,6 +27,7 @@
   <div id="tracks" role="group" aria-label="Track"></div>
 
   <button id="go" type="button">Start</button>
+  <button id="lockbtn" type="button" hidden>Lock screen for pocket</button>
 
   <details id="more">
     <summary>Settings</summary>
@@ -35,6 +36,7 @@
       <label>Input
         <div class="seg" data-key="source">
           <button type="button" data-v="drive">Drive</button>
+          <button type="button" data-v="walk">Walk</button>
           <button type="button" data-v="sim">Simulate</button>
         </div>
       </label>
@@ -75,6 +77,11 @@
     <p class="hint"><span id="version"></span> <button id="update" type="button">Check for updates</button></p>
   </details>
 </main>
+<div id="lock" hidden>
+  <p id="lockrate"></p>
+  <p>Screen locked</p>
+  <p class="hint">Press and hold anywhere for a second to unlock</p>
+</div>
 <script src="app.js"></script>
 </body>
 </html>

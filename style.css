@@ -64,3 +64,12 @@ h1 { margin: 0; font-size: 20px; letter-spacing: 0.04em; }
 #update { border: 0; background: none; color: var(--a); font-size: 13px; padding: 8px; cursor: pointer; text-decoration: underline; }
 :focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
 .hint a { color: inherit; }
+
+#lockbtn { height: 48px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+#lock {
+  position: fixed; inset: 0; z-index: 10; background: #000; color: #555; text-align: center;
+  display: grid; align-content: center; gap: 8px; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+#lock p { margin: 0; }
+#lockrate { font-size: 22px; color: #777; }
+#lock.holding { color: var(--a); }

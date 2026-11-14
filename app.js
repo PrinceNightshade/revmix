@@ -911,6 +911,7 @@ function onPositionError(e) {
 function onMotion(e) {
   const g = e.accelerationIncludingGravity, a = e.acceleration, r = e.rotationRate;
   if (!g || g.x == null) return;
+  if (settings.source === 'walk') countStep(Math.hypot(g.x, g.y, g.z), performance.now());
   const hasLin = a && a.x != null;
   // Unit vector pointing up, in phone coordinates — works however the phone is mounted.
   let ux, uy, uz;
@@ -946,7 +947,7 @@ async function startSensors() {
     catch { /* declined: speed still works */ }
   }
   // The permission prompt can outlast a tap on Stop or a switch to Simulate.
-  if (!running || settings.source !== 'drive') return;
+  if (!running || settings.source === 'sim') return;
   if (motionOk) addEventListener('devicemotion', onMotion);
   if (geoId != null) return;
   if ('geolocation' in navigator) {
@@ -960,12 +961,70 @@ function stopSensors() {
   geoId = null;
   Object.assign(gps, { target: 0, long: 0, lastV: null, lastPos: null, anchor: null, heading: null, fixAt: 0, acc: null });
   Object.assign(motion, { turn: 0, horiz: 0, seen: false, grav: null, lin: false });
+  Object.assign(step, { above: false, last: 0, gaps: [], cadence: 0, smooth: 0, run: false, live: false });
   Object.assign(fuse, { h: null, yaw: 0, lastFix: 0, lastGps: null }); // the learned left/right sense is kept
 }
 
 async function holdWake() {
   try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } }
   catch { /* not allowed right now */ }
+}
+
+/* ---------- Walking ---------- */
+// On foot the music follows your steps instead of a car. Each footfall jolts the phone, wherever it is carried;
+// counting those jolts gives steps per minute. Walking: one step per beat, so the tempo is your pace.
+// Running: one step per half-beat (the tempo is half your pace) with the fuller "highway" music, whose
+// eighth-note bass then lands on every step. Layers join as the pace picks up, as they do with speed in a car.
+const step = { lp: 9.81, sm: 0, amp: 1.5, above: false, last: 0, gaps: [], cadence: 0, smooth: 0, run: false, live: false, tempoAt: 0 };
+function countStep(mag, ms) {
+  step.live = true;
+  step.lp += (mag - step.lp) * 0.02;                 // the steady pull of gravity
+  step.sm += (mag - step.lp - step.sm) * 0.25;       // the bounce on top of it
+  step.amp = Math.max(step.amp * 0.9985, step.sm);   // how big recent bounces have been
+  const thr = Math.max(0.7, 0.4 * step.amp);
+  if (step.sm > thr) {
+    if (!step.above && ms - step.last > 260) {
+      const gap = ms - step.last;
+      if (gap < 1500) {
+        step.gaps.push(gap); if (step.gaps.length > 6) step.gaps.shift();
+        const sorted = [...step.gaps].sort((a, b) => a - b);
+        step.cadence = 60000 / sorted[sorted.length >> 1]; // the middle of the last few gaps, so one odd step doesn't matter
+      } else step.gaps = [];
+      step.last = ms;
+    }
+    step.above = true;
+  } else if (step.sm < thr * 0.5) step.above = false;
+}
+
+// Steps per minute -> the "speed" the rest of the app understands (m/s), so a stroll brings in a few layers,
+// a brisk walk brings in all of them, and a run reaches the highway music.
+const PACE = [[0, 0], [60, 3], [100, 8], [125, 12], [140, 16], [150, 22], [185, 27]];
+const WALK_HWY = 18;
+function paceSpeed(c) {
+  for (let k = 1; k < PACE.length; k++) {
+    if (c <= PACE[k][0]) return PACE[k - 1][1] + (PACE[k][1] - PACE[k - 1][1]) * (c - PACE[k - 1][0]) / (PACE[k][0] - PACE[k - 1][0]);
+  }
+  return PACE[PACE.length - 1][1];
+}
+
+function walkStep(dt) {
+  const cad = performance.now() - step.last > 1800 ? 0 : step.cadence; // no step for a couple of seconds = standing still
+  step.smooth += (cad - step.smooth) * Math.min(1, dt * 1.2);
+  const c = step.smooth;
+  if (c > 140) step.run = true; else if (c < 125) step.run = false;
+  const before = input.speed;
+  input.speed += (paceSpeed(c) - input.speed) * Math.min(1, dt * 1.5);
+  if (cad === 0 && input.speed < 0.35) input.speed = 0;
+  // Picking up the pace counts as accelerating, slowing down as braking.
+  input.long += ((input.speed - before) / dt / 9.81 * 0.5 - input.long) * Math.min(1, dt * 3);
+  input.gain = input.long; input.push = Math.max(0, input.long);
+  input.turn = 0;               // a phone in a hand or pocket twists constantly; that is not steering
+  input.heading = gps.heading;  // direction comes from GPS alone
+  if (c > 50) {
+    const want = clamp(step.run ? c / 2 : c, 60, 140);
+    seq.bpm += (want - seq.bpm) * Math.min(1, dt * 0.8);
+    if (Math.abs(seq.bpm - step.tempoAt) > 2) { step.tempoAt = seq.bpm; setTempoFx(ctx.currentTime); }
+  }
 }
 
 /* ---------- Simulator ---------- */
@@ -1058,7 +1117,7 @@ function pickDir(h, cur) {
 
 function control() {
   const dt = 0.05, now = performance.now();
-  if (settings.source === 'sim') simStep(dt); else driveStep(dt);
+  if (settings.source === 'sim') simStep(dt); else if (settings.source === 'walk') walkStep(dt); else driveStep(dt);
 
   const moving = input.speed >= 0.4;
   // Pedals: both answer from a light touch (0.03 g) and are fully on by an ordinary firm press.
@@ -1076,7 +1135,7 @@ function control() {
   const surge = mix.surge;
 
   // Zone: street or highway, with a gap between the two thresholds so it doesn't flicker.
-  const hwy = HWY[settings.hwy];
+  const hwy = settings.source === 'walk' ? WALK_HWY : HWY[settings.hwy];
   if (mix.zoneWant === 'street' && input.speed > hwy) mix.zoneWant = 'highway';
   else if (mix.zoneWant === 'highway' && input.speed < hwy * 0.85) mix.zoneWant = 'street';
   const highway = mix.zoneWant === 'highway';
@@ -1134,6 +1193,10 @@ function control() {
   mix.turning = turning;
 
   if (settings.source === 'sim') statusText = 'Simulating';
+  else if (settings.source === 'walk') {
+    statusText = !step.live ? 'Waiting for the motion sensor — allow motion access'
+      : step.smooth < 40 ? 'Standing still' : `${step.run ? 'Running' : 'Walking'} · ${Math.round(step.smooth)} steps/min`;
+  }
   else if (gps.denied) statusText = 'Location is off — allow it to read speed';
   else if (!gps.fixAt) statusText = 'Waiting for GPS…';
   else if (now - gps.fixAt > 6000) statusText = 'GPS signal lost';
@@ -1157,7 +1220,7 @@ async function start() {
   ctlTimer = setInterval(control, 50);
   render();
   holdWake();
-  if (settings.source === 'drive') await startSensors();
+  if (settings.source !== 'sim') await startSensors();
 }
 
 function stop() {
@@ -1189,7 +1252,8 @@ async function setSource(src) {
   settings.source = src; store.set('rm.source', src);
   if (running) {
     stopSensors(); sim.v = input.speed;
-    if (src === 'drive') await startSensors();
+    seq.bpm = TRACKS[settings.track].bpm; setTempoFx(ctx.currentTime); // back to the track's own tempo; walking sets its own
+    if (src !== 'sim') await startSensors();
   }
 }
 
@@ -1232,6 +1296,18 @@ function buildUI() {
   }
 
   $('#go').onclick = () => (running ? stop() : start());
+  // Pocket lock: a black screen that ignores taps, so a phone in a pocket can't stop the music or change track.
+  // Pressing and holding anywhere for a second unlocks it.
+  let lockTimer = null;
+  const lock = $('#lock');
+  $('#lockbtn').onclick = () => { lock.hidden = false; };
+  const letGo = () => { clearTimeout(lockTimer); lockTimer = null; lock.classList.remove('holding'); };
+  lock.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); letGo(); lock.classList.add('holding');
+    lockTimer = setTimeout(() => { lock.hidden = true; letGo(); }, 1000);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) lock.addEventListener(ev, letGo);
+  lock.addEventListener('contextmenu', (e) => e.preventDefault());
 
   const hold = (el, prop) => {
     const on = (e) => { e.preventDefault(); sim[prop] = true; el.classList.add('held'); };
@@ -1282,7 +1358,8 @@ function drawEq() {
 
 function render() {
   const kmh = settings.units === 'kmh';
-  const speed = running ? `${Math.round(input.speed * (kmh ? 3.6 : 2.23694))} ${kmh ? 'km/h' : 'mph'}` : '';
+  const walking = settings.source === 'walk';
+  const speed = !running ? '' : walking ? `${Math.round(step.smooth)} steps/min` : `${Math.round(input.speed * (kmh ? 3.6 : 2.23694))} ${kmh ? 'km/h' : 'mph'}`;
   const zone = !running ? '' : input.speed < 0.4 ? 'Idle' : mix.surge > 0.5 ? 'Surge' : mix.zoneWant === 'highway' ? 'Highway' : 'Street';
   const point = input.heading == null ? '' : POINTS[Math.round(input.heading / 45) % 8];
   // The acceleration the crash is judged on, shown while it is above a gentle 0.05 g, so the threshold can be checked on the road.
@@ -1294,6 +1371,9 @@ function render() {
   $('#go').textContent = running ? 'Stop' : 'Start';
   $('#go').classList.toggle('on', running);
   $('#sim').hidden = settings.source !== 'sim';
+  $('#lockbtn').hidden = !(running && walking);
+  if (!(running && walking)) $('#lock').hidden = true;
+  $('#lockrate').textContent = step.smooth < 40 ? 'Standing still' : `${Math.round(step.smooth)} steps/min`;
   drawEq();
   if (running && !frameQueued) {
     frameQueued = true;
