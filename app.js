@@ -207,7 +207,6 @@ function makeChapter(id, n) {
 // Each compass direction has a signature sound. Their volumes follow the heading, so NE is half N, half E.
 const DIR_SOUND = { N: 'glass', E: 'pluck', S: 'drone', W: 'strings' };
 const DIR_VOL = { N: 0.2, E: 0.2, S: 0.26, W: 0.11 };
-const SECT_AT = { N: 'choir', W: 'strings', S: 'brass' };
 const E_PLUCK = 'x..x..x..x.x..x.';
 const STAB = '...x..x...x..x..';
 
@@ -227,9 +226,7 @@ const settings = {
   units: store.get('rm.units', 'mph'),
   source: store.get('rm.source', 'drive'),
   rotate: store.get('rm.rotate', '5'),
-  compass: store.get('rm.compass', 'surround'),
 };
-if (!['blend', 'surround'].includes(settings.compass)) settings.compass = 'surround';
 if (!TRACKS[settings.track]) settings.track = 'neon';
 if (!HWY[settings.hwy]) settings.hwy = 'mid';
 if (!(settings.rotate in ROTATE)) settings.rotate = '5';
@@ -254,7 +251,7 @@ let ctx, A; // A = audio nodes
 // ci = which of the 8 chords is sounding; held and dist = bars and metres travelled since it arrived.
 // zone and dir only change on a bar line, so switches land in time.
 // bpm is fixed for the whole drive: it is set by the track you choose and kept when tracks rotate.
-const seq = { step: 0, bar: 0, cycle: 0, ci: 0, held: 0, dist: 0, idle: 0, idlePat: null, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
+const seq = { step: 0, bar: 0, cycle: 0, ci: 0, held: 0, dist: 0, idle: 0, idlePat: null, sweep: null, lastSweep: -1e9, zone: 'street', dir: 'N', launch: false, lastLaunch: -1e9, trackStart: 0, bpm: TRACKS[settings.track].bpm };
 let chap = makeChapter(settings.track, 0); // the chapter being played
 let nextTime = 0, schedTimer = null, ctlTimer = null;
 
@@ -319,15 +316,6 @@ function buildAudio() {
     return f;
   });
   const choirSung = ctx.createGain(); choirSung.connect(layer.pad);
-  // In Surround the three held sections each live at a compass point: choir north, strings west, brass south.
-  const sect = {};
-  for (const name of ['choir', 'strings', 'brass']) {
-    const g = ctx.createGain();
-    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 20000; tone.Q.value = 0.5;
-    const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-    g.connect(tone); tone.connect(pn); pn.connect(choirSung);
-    sect[name] = { g, tone, pn };
-  }
   const vibLfo = ctx.createOscillator(); vibLfo.frequency.value = 5.1;
   const vib = ctx.createGain(); vib.gain.value = 0; vibLfo.connect(vib); vibLfo.start();
   const padOsc = [];
@@ -343,21 +331,11 @@ function buildAudio() {
   // Compass sounds. N: bell notes into the main echo. E: short plucks into their own quick, bouncing echo.
   // S: a low drone. W: a wide wash of detuned strings. The drone and strings run all the time and are retuned per chord.
   const dirGain = {};
-  // Each compass sound can be placed around the listener: a tone filter (duller = further behind),
-  // a left-right position, and its own amount of room (more = further away).
-  const dirTone = {}, dirPan = {}, dirRoom = {};
-  for (const d of DIRS) {
-    const g = ctx.createGain(); g.gain.value = 0; dirGain[d] = g;
-    const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 20000; tone.Q.value = 0.5;
-    const pn = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-    const rm = ctx.createGain();
-    g.connect(tone); tone.connect(pn); pn.connect(lp); pn.connect(rm); rm.connect(room);
-    dirTone[d] = tone; dirPan[d] = pn; dirRoom[d] = rm;
-  }
+  for (const d of DIRS) { const g = ctx.createGain(); g.gain.value = 0; g.connect(lp); g.connect(room); dirGain[d] = g; }
   const bellSend = ctx.createGain(); bellSend.gain.value = 0.35; // only a little echo, so bells don't ring into the next chord
   dirGain.N.connect(bellSend); bellSend.connect(delay);
   const eDelay = ctx.createDelay(1), eFb = ctx.createGain(); eFb.gain.value = 0.5;
-  dirGain.E.connect(eDelay); eDelay.connect(eFb); eFb.connect(eDelay); eDelay.connect(dirTone.E);
+  dirGain.E.connect(eDelay); eDelay.connect(eFb); eFb.connect(eDelay); eDelay.connect(lp);
 
   const droneLp = ctx.createBiquadFilter(); droneLp.type = 'lowpass'; droneLp.frequency.value = 320; droneLp.connect(dirGain.S);
   const drone = [['sine', -12, 0.5], ['sawtooth', 0, 0.3], ['sawtooth', 0.08, 0.3]].map(([type, semis, vol]) => {
@@ -381,7 +359,7 @@ function buildAudio() {
     }
   }
 
-  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, sect, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, dirTone, dirPan, dirRoom, eDelay, drone, strings };
+  A = { master, lp, analyser, delay, fb, wet, pan, duck, fx, layer, noise, padFilter, padOsc, padDry, choirOut, formants, vib, vibLfo, choirSung, stringLp, idle, smp: {}, roomWet, warm, hollow, dirGain, eDelay, drone, strings };
 }
 
 // The chords move with the road, not the clock: a new chord arrives every CHORD_M metres, landing on a
@@ -683,6 +661,7 @@ function scheduleStep(t) {
     // Section changes land on a bar line. A new direction or zone restarts the 8-bar chord sequence.
     const zoned = seq.zone !== mix.zoneWant;
     if (zoned || seq.dir !== mix.dirWant) {
+      if (seq.dir !== mix.dirWant && mix.level.kick > 0.3) crash(t, 0.6); // a drum stroke marks the new direction (no cymbal)
       seq.dir = mix.dirWant; seq.zone = mix.zoneWant;
       if (!tr.canon) { // the Canon is one loop everywhere, so it just carries on
         if (seq.bar !== 0) { seq.bar = 0; seq.cycle++; }
@@ -730,14 +709,14 @@ function scheduleStep(t) {
     const ck = tr.kit.choir || {}, sk = tr.kit.strings || {};
     const swell = breakdown && L.kick > 0.3 ? 0.7 : 0;
     const low = root + 12 + chord.r, mid = low + 12;
-    sustain('choir', 'choir', A.sect.choir.g, t, chord.iv.map((v) => low + v),
+    sustain('choir', 'choir', A.choirSung, t, chord.iv.map((v) => low + v),
       Math.max((highway ? ck.hw : ck.street) || 0, swell) * CHOIR_VOL, 2);
-    sustain('strings', 'strings', A.sect.strings.g, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
+    sustain('strings', 'strings', A.choirSung, t, [low, mid + chord.iv[1], mid + chord.iv[2], mid + 12],
       ((highway ? sk.hw : sk.street) || 0) * STRINGS_VOL, 1);
     sustain('west', 'strings', A.dirGain.W, t, chord.iv.slice(0, 3).map((v) => mid + v), mix.dirW.W > 0.03 ? WEST_VOL : 0, 1);
     // Trombones hold the chord on the highway, and whenever the car is accelerating briskly.
     const bk = tr.kit.brass || {};
-    sustain('brass', 'trombone', A.sect.brass.g, t, [low, low + chord.fifth], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
+    sustain('brass', 'trombone', A.choirSung, t, [low, low + chord.fifth], ((highway || surge > 0.5 ? bk.hw : bk.street) || 0) * BRASS_VOL, 1);
     if (build && L.kick > 0.3) {
       timpRoll(t, root, s16 * 16);
       // Shimmering violins swell through the bar before a new chapter.
@@ -811,6 +790,13 @@ function scheduleStep(t) {
   if (seq.idlePat && seq.idlePat[i] != null && input.speed < 0.4) {
     const k = seq.idlePat[i], tones = chord.iv.slice(0, 3);
     pluck(t, A.idle, root + 24 + chord.r + tones[k % 3] + (k >= 3 ? 12 : 0), tr.kit.idle || 'celeste', s16 * 6, 0.6, 2400);
+  }
+
+  if (seq.sweep) {
+    const ladder = [0, 1, 2].map((v) => chord.iv[v]).concat([0, 1, 2].map((v) => chord.iv[v] + 12), [24]);
+    const k = seq.sweep.up ? seq.sweep.k : ladder.length - 1 - seq.sweep.k;
+    pluck(t, A.idle, root + 24 + chord.r + ladder[k], 'harp', s16 * 3, 1.5, 3200);
+    if (++seq.sweep.k >= ladder.length) seq.sweep = null;
   }
 
   // Compass sounds that are played as notes (the drone and strings sound continuously).
@@ -1075,13 +1061,14 @@ function control() {
   if (settings.source === 'sim') simStep(dt); else driveStep(dt);
 
   const moving = input.speed >= 0.4;
-  const boost = clamp(input.long / 0.25), brake = clamp(-input.long / 0.3);
+  // Pedals: both answer from a light touch (0.03 g) and are fully on by an ordinary firm press.
+  const boost = clamp((input.long - 0.03) / 0.2), brake = clamp((-input.long - 0.03) / 0.22);
   mix.boost = boost; mix.brake = brake;
 
   // Surge: hard acceleration. Rises fast, lets go slowly so a gear change doesn't cut it off.
-  const surgeTarget = moving ? clamp((input.long - 0.1) / 0.15) : 0;
+  const surgeTarget = moving ? clamp((input.long - 0.08) / 0.14) : 0;
   const was = mix.surge;
-  mix.surge += (surgeTarget - mix.surge) * (surgeTarget > mix.surge ? 0.3 : 0.03);
+  mix.surge += (surgeTarget - mix.surge) * (surgeTarget > mix.surge ? 0.4 : 0.07); // in at once, out within a second of lifting off
   // The driving groove above answers ordinary brisk acceleration. A crash is kept for a properly hard push.
   const hard = moving && input.gain >= HARD_G; // judged on real speed gain only
   if (hard && !mix.hard && now - seq.lastLaunch > CRASH_GAP) seq.launch = true;
@@ -1103,33 +1090,17 @@ function control() {
   const eff = Math.max(0, input.speed + boost * 2 - brake * 1.5); // m/s, nudged by the pedals
   const mph = moving ? eff * 2.23694 : 0;
 
-  // Compass sounds, fading in over the first 8 mph. Two ways to hear them:
-  // Blend: only the direction you face is heard; neighbours cross-fade (cos², so two always add up to a whole).
-  // Surround: all four play at once, pinned to the compass. What you face is in front (centred, clear, full),
-  // what is beside you is in that speaker, and what is behind is quiet, dull and distant. Turning swings them round.
-  // The choir (north), strings (west) and brass (south) are placed the same way, so the effect is carried by the main sound.
-  const presence = clamp(mph / 8), now2 = ctx.currentTime, around = settings.compass === 'surround';
+  // Compass sounds, fading in over the first 8 mph: each one's share is cos² of how far the heading is from its
+  // direction, so two neighbours always add up to a whole and cross-fade as the car turns.
+  const presence = clamp(mph / 8);
   DIRS.forEach((d, k) => {
-    const rel = input.heading == null ? null : (k * 90 - input.heading) * RAD; // where this sound sits, relative to the nose of the car
-    const side = rel == null ? 0 : Math.sin(rel), front = rel == null ? 0 : (Math.cos(rel) + 1) / 2; // -1 left..1 right; 0 behind..1 ahead
-    const facing = rel == null ? 0 : Math.max(0, Math.cos(rel));
-    const want = rel == null ? 0 : around ? 1.1 * (0.18 + 0.82 * Math.pow(front, 1.5)) : facing * facing;
-    mix.dirW[d] += (want * presence - mix.dirW[d]) * (around ? 0.2 : 0.08);
-    A.dirGain[d].gain.setTargetAtTime(mix.dirW[d] * DIR_VOL[d], now2, around ? 0.12 : 0.3);
-    if (A.dirPan[d].pan) A.dirPan[d].pan.setTargetAtTime(around ? side * 0.9 : 0, now2, 0.12);
-    A.dirTone[d].frequency.setTargetAtTime(around ? 600 * Math.pow(33, front) : 20000, now2, 0.12);
-    A.dirRoom[d].gain.setTargetAtTime(around ? 0.4 + 1.2 * (1 - front) : 1, now2, 0.2);
-    const sc = A.sect[SECT_AT[d]]; // the section that lives at this compass point, if any
-    if (sc) {
-      const on = around && rel != null;
-      sc.g.gain.setTargetAtTime(on ? 0.45 + 0.8 * Math.pow(front, 1.3) : 1, now2, 0.15);
-      if (sc.pn.pan) sc.pn.pan.setTargetAtTime(on ? side * 0.85 : 0, now2, 0.15);
-      sc.tone.frequency.setTargetAtTime(on ? 900 * Math.pow(22, front) : 20000, now2, 0.15);
-    }
+    const c = input.heading == null ? 0 : Math.max(0, Math.cos((input.heading - k * 90) * RAD));
+    mix.dirW[d] += (c * c * presence - mix.dirW[d]) * 0.2;
+    A.dirGain[d].gain.setTargetAtTime(mix.dirW[d] * DIR_VOL[d], ctx.currentTime, 0.15);
   });
   // Brightness keeps climbing all the way to highway speed, so 25-45 mph no longer sounds the same throughout.
   let I = highway ? 0.75 + 0.25 * clamp((input.speed - hwy) / (hwy * 0.5)) : 0.7 * Math.pow(clamp(eff / hwy), 0.7);
-  I = moving ? clamp(I + surge * 0.15) : 0;
+  I = moving ? clamp(I + surge * 0.15 + boost * 0.2 - brake * 0.3) : 0; // even gentle throttle brightens the sound; braking darkens it
   mix.intensity = I;
   // The choir, strings and brass swell with speed instead of sitting at one level, so they don't mask the layers
   // joining, and the whole mix gets a little louder as road noise rises. (Cathedral's choir is its main sound, so it stays fuller.)
@@ -1141,7 +1112,8 @@ function control() {
   for (const name of LAYERS) {
     let lv = name === 'stabs' ? (highway ? 1 : clamp((surge - 0.3) / 0.4)) : clamp((mph - JOIN[name]) / 3);
     if (name === 'bass' || name === 'kick' || name === 'hats' || name === 'snare') lv = Math.max(lv, surge); // surge brings the beat in early
-    if (name === 'kick' || name === 'hats' || name === 'snare') lv *= 1 - brake * 0.85; // drums thin out under braking
+    if (name === 'kick' || name === 'hats' || name === 'snare') lv *= 1 - brake * 0.9; // drums thin out under braking
+    if (name === 'bass') lv *= 1 - brake * 0.6;
     if (!moving && name !== 'pad') lv = 0;
     mix.level[name] = lv;
     // Under acceleration the kick and bass step forward and the melodic layers step back to make room.
@@ -1150,13 +1122,16 @@ function control() {
   }
   const drift = 1 + 0.25 * Math.sin(now / 1000 * 2 * Math.PI * 0.05); // slow sweep so a held chord still moves
   A.padFilter.frequency.setTargetAtTime((280 + 3200 * I) * drift * (1 + 0.3 * mix.bright), t, 0.3);
-  A.wet.gain.setTargetAtTime(Math.max(0.05, TRACKS[settings.track].kit.echo - 0.1 * mix.bright), t, 0.5);
-  A.lp.frequency.setTargetAtTime(18000 * Math.pow(0.03, brake), t, 0.12); // braking closes the filter
+  // Braking also lets the echo bloom, so the music seems to hang in the air as the car slows.
+  A.wet.gain.setTargetAtTime(Math.max(0.05, TRACKS[settings.track].kit.echo - 0.1 * mix.bright) + 0.45 * brake, t, brake > 0.1 ? 0.12 : 0.5);
+  A.lp.frequency.setTargetAtTime(18000 * Math.pow(0.03, brake), t, 0.08); // braking closes the filter
   const turnN = clamp(input.turn / 25, -1, 1);
-  // The melody leans as you steer. In Blend it leans into the turn. In Surround it must go the other way:
-  // the music stays put in the world while the car turns, so turning right moves everything to your left.
-  if (A.pan.pan) A.pan.pan.setTargetAtTime(turnN * (settings.compass === 'surround' ? -0.6 : 0.8), t, 0.2);
-  A.fb.gain.setTargetAtTime(0.28 + 0.4 * Math.abs(turnN), t, 0.2);
+  if (A.pan.pan) A.pan.pan.setTargetAtTime(turnN * 0.85, t, 0.12); // the melody leans into the turn
+  A.fb.gain.setTargetAtTime(Math.min(0.75, 0.28 + 0.4 * Math.abs(turnN) + 0.25 * brake), t, 0.2);
+  // Turning in: the moment the wheel goes over, a harp run sweeps up (right) or down (left).
+  const turning = Math.abs(input.turn) > 9 && mph > 6;
+  if (turning && !mix.turning && now - seq.lastSweep > 3500) { seq.sweep = { up: input.turn > 0, k: 0 }; seq.lastSweep = now; }
+  mix.turning = turning;
 
   if (settings.source === 'sim') statusText = 'Simulating';
   else if (gps.denied) statusText = 'Location is off — allow it to read speed';
@@ -1257,18 +1232,6 @@ function buildUI() {
   }
 
   $('#go').onclick = () => (running ? stop() : start());
-  // Left/right check: one note in the left speaker, then two in the right.
-  $('#lrcheck').onclick = () => {
-    if (!ctx) return void ($('#lrcheck').textContent = 'Press Start first, then try again');
-    $('#lrcheck').textContent = 'Left/right check: 1 note left, then 2 right';
-    [[0, -1], [1.0, 1], [1.4, 1]].forEach(([at, side]) => {
-      const o = ctx.createOscillator(), g = ctx.createGain(), p = ctx.createStereoPanner();
-      const t = ctx.currentTime + 0.1 + at;
-      o.frequency.value = 660; p.pan.value = side;
-      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      o.connect(g); g.connect(p); p.connect(ctx.destination); o.start(t); o.stop(t + 0.35);
-    });
-  };
 
   const hold = (el, prop) => {
     const on = (e) => { e.preventDefault(); sim[prop] = true; el.classList.add('held'); };
